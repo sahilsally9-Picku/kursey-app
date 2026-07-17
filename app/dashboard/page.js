@@ -2,13 +2,25 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
+import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [checking, setChecking] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
-    async function load() {
+    async function init() {
+      // 1. check if logged in
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        router.push("/login");
+        return;
+      }
+      setChecking(false);
+
+      // 2. load bookings
       const { data, error } = await supabase
         .from("bookings")
         .select("*")
@@ -16,16 +28,33 @@ export default function Dashboard() {
       if (!error) setBookings(data);
       setLoading(false);
     }
-    load();
-  }, []);
+    init();
+  }, [router]);
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push("/login");
+  }
 
   const revenue = bookings.reduce((sum, b) => sum + (b.price || 0), 0);
+
+  if (checking) {
+    return <div className="flex min-h-screen items-center justify-center bg-stone-100 text-stone-500">Loading…</div>;
+  }
 
   return (
     <div className="min-h-screen bg-stone-100 text-stone-900">
       <div className="mx-auto max-w-2xl px-4 py-8">
-        <h1 className="text-2xl font-bold">Fade &amp; Co — Dashboard</h1>
-        <p className="text-sm text-stone-500">Every booking that comes in.</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Fade &amp; Co — Dashboard</h1>
+            <p className="text-sm text-stone-500">Every booking that comes in.</p>
+          </div>
+          <button onClick={handleLogout}
+            className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-300">
+            Log out
+          </button>
+        </div>
 
         {/* stats */}
         <div className="mt-4 grid grid-cols-2 gap-3">

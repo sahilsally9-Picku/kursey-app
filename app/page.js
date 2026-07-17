@@ -1,14 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-
-const services = [
-  { id: "fade", name: "Skin Fade", price: 30, mins: 30 },
-  { id: "beard", name: "Beard Trim", price: 18, mins: 20 },
-  { id: "combo", name: "Cut + Beard", price: 45, mins: 45 },
-  { id: "kids", name: "Kids Cut", price: 22, mins: 25 },
-];
 
 const barbers = [
   { id: "marcus", name: "Marcus", tags: ["Skin fades", "Tapers"], color: "bg-emerald-700",
@@ -34,7 +27,9 @@ const taken = {
 };
 
 export default function Home() {
-  const [step, setStep] = useState("service"); // service, barber, time, details, done
+  const [services, setServices] = useState([]);
+  const [loadingServices, setLoadingServices] = useState(true);
+  const [step, setStep] = useState("service");
   const [service, setService] = useState(null);
   const [barber, setBarber] = useState(null);
   const [day, setDay] = useState("today");
@@ -45,10 +40,21 @@ export default function Home() {
   const [offers, setOffers] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    async function loadServices() {
+      const { data } = await supabase.from("services").select("*").order("created_at", { ascending: true });
+      if (data) setServices(data);
+      setLoadingServices(false);
+    }
+    loadServices();
+  }, []);
+
   const reset = () => {
     setStep("service"); setService(null); setBarber(null); setDay("today");
     setSlot(null); setName(""); setPhone(""); setEmail(""); setOffers(false);
   };
+
+  const input = "w-full rounded-xl bg-white px-4 py-3 text-sm text-stone-900 outline-none ring-1 ring-stone-300 placeholder:text-stone-400 focus:ring-emerald-500";
 
   return (
     <div className="min-h-screen bg-stone-100 text-stone-900">
@@ -63,22 +69,30 @@ export default function Home() {
           </div>
         </div>
 
-        {/* STEP 1: service */}
+        {/* STEP 1: service (from database) */}
         {step === "service" && (
           <>
             <h2 className="mt-6 mb-3 text-lg font-semibold">Choose a service</h2>
-            <div className="space-y-2">
-              {services.map((s) => (
-                <button key={s.id} onClick={() => { setService(s); setStep("barber"); }}
-                  className="flex w-full items-center justify-between rounded-xl bg-white p-4 text-left ring-1 ring-stone-200 transition hover:ring-emerald-400">
-                  <div>
-                    <div className="font-medium">{s.name}</div>
-                    <div className="text-sm text-stone-500">{s.mins} min</div>
-                  </div>
-                  <div className="text-lg font-semibold">${s.price}</div>
-                </button>
-              ))}
-            </div>
+            {loadingServices ? (
+              <p className="text-stone-500">Loading services…</p>
+            ) : services.length === 0 ? (
+              <p className="rounded-xl bg-white p-4 text-stone-500 ring-1 ring-stone-200">
+                No services yet. Add some in Settings.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {services.map((s) => (
+                  <button key={s.id} onClick={() => { setService(s); setStep("barber"); }}
+                    className="flex w-full items-center justify-between rounded-xl bg-white p-4 text-left ring-1 ring-stone-200 transition hover:ring-emerald-400">
+                    <div>
+                      <div className="font-medium">{s.name}</div>
+                      <div className="text-sm text-stone-500">{s.mins} min</div>
+                    </div>
+                    <div className="text-lg font-semibold">${s.price}</div>
+                  </button>
+                ))}
+              </div>
+            )}
           </>
         )}
 
@@ -154,47 +168,31 @@ export default function Home() {
           <>
             <button onClick={() => setStep("time")} className="mt-6 text-sm font-medium text-stone-500">← Back</button>
             <h2 className="mt-2 mb-3 text-lg font-semibold">Your details</h2>
-
             <div className="rounded-2xl bg-white p-4 ring-1 ring-stone-200">
               <div className="flex justify-between text-sm"><span className="text-stone-400">Service</span><span className="font-medium">{service.name} · ${service.price}</span></div>
               <div className="mt-1 flex justify-between text-sm"><span className="text-stone-400">Barber</span><span className="font-medium">{barber.name}</span></div>
               <div className="mt-1 flex justify-between text-sm"><span className="text-stone-400">When</span><span className="font-medium">{days.find((d) => d.id === day).label} at {slot}</span></div>
             </div>
-
             <div className="mt-3 space-y-2">
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name"
-                className="w-full rounded-xl bg-white px-4 py-3 text-sm outline-none ring-1 ring-stone-200 focus:ring-emerald-400" />
-              <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Mobile number"
-                className="w-full rounded-xl bg-white px-4 py-3 text-sm outline-none ring-1 ring-stone-200 focus:ring-emerald-400" />
-              <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (confirmation & receipts)"
-                className="w-full rounded-xl bg-white px-4 py-3 text-sm outline-none ring-1 ring-stone-200 focus:ring-emerald-400" />
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className={input} />
+              <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Mobile number" className={input} />
+              <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (confirmation & receipts)" className={input} />
             </div>
-
             <button onClick={() => setOffers(!offers)} className="mt-2 flex w-full items-start gap-2 rounded-xl bg-white p-3 text-left text-sm ring-1 ring-stone-200">
               <span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded border text-white ${offers ? "border-emerald-600 bg-emerald-600" : "border-stone-300"}`}>{offers ? "✓" : ""}</span>
               <span className="text-stone-600">Email me offers &amp; news from Fade &amp; Co <span className="text-stone-400">— optional, unsubscribe anytime</span></span>
             </button>
-
             <button disabled={!name || !phone || saving}
               onClick={async () => {
                 setSaving(true);
                 const { error } = await supabase.from("bookings").insert({
-                  service: service.name,
-                  price: service.price,
-                  barber: barber.name,
-                  day: days.find((d) => d.id === day).label,
-                  slot: slot,
-                  customer_name: name,
-                  phone: phone,
-                  email: email,
-                  wants_offers: offers,
+                  service: service.name, price: service.price, barber: barber.name,
+                  day: days.find((d) => d.id === day).label, slot: slot,
+                  customer_name: name, phone: phone, email: email, wants_offers: offers,
                 });
                 setSaving(false);
-                if (error) {
-                  alert("Something went wrong saving your booking: " + error.message);
-                } else {
-                  setStep("done");
-                }
+                if (error) { alert("Something went wrong: " + error.message); }
+                else { setStep("done"); }
               }}
               className="mt-3 w-full rounded-xl bg-emerald-600 py-3 font-semibold text-white transition enabled:hover:bg-emerald-700 disabled:opacity-40">
               {saving ? "Booking..." : "Confirm booking"}
