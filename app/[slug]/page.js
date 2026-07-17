@@ -38,6 +38,7 @@ export default function ShopBooking() {
   const [dayBookings, setDayBookings] = useState([]); const [loadingSlots, setLoadingSlots] = useState(false);
   const [name, setName] = useState(""); const [phone, setPhone] = useState(""); const [email, setEmail] = useState("");
   const [offers, setOffers] = useState(false); const [saving, setSaving] = useState(false);
+  const [lightbox, setLightbox] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -93,6 +94,12 @@ export default function ShopBooking() {
 
   return (
     <div className="min-h-screen bg-stone-100 text-stone-900">
+      {/* lightbox for viewing a work photo big */}
+      {lightbox && (
+        <div onClick={() => setLightbox(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <img src={lightbox} alt="" className="max-h-[90vh] max-w-full rounded-xl" />
+        </div>
+      )}
       <div className="mx-auto max-w-lg px-4 py-8">
         <div className="mb-3 flex items-center justify-end gap-3 text-sm">
           {customer ? (<><button onClick={openHistory} className="font-medium text-emerald-700 hover:underline">My bookings</button><button onClick={logoutCustomer} className="text-stone-500 hover:underline">Log out</button></>)
@@ -104,7 +111,10 @@ export default function ShopBooking() {
           <div className="px-5 pb-5">
             <div className="-mt-8 mb-2 grid h-16 w-16 place-items-center overflow-hidden rounded-2xl bg-emerald-600 text-2xl font-bold text-white shadow ring-4 ring-white">{shop.logo_url ? <img src={shop.logo_url} alt={shop.name} className="h-full w-full object-cover" /> : shop.name[0]}</div>
             <h1 className="text-2xl font-bold">{shop.name}</h1>
-            <p className="text-sm text-stone-500">{customer ? `Welcome back, ${customer.profile?.name || "friend"}!` : "Book in seconds — no app, no account needed."}</p>
+            {shop.description && <p className="mt-1 text-sm leading-relaxed text-stone-600">{shop.description}</p>}
+            <div className="mt-2 flex flex-col gap-1 text-sm text-stone-500">{shop.address && <div className="flex items-center gap-1.5"><span>📍</span>{shop.address}</div>}{shop.phone && <div className="flex items-center gap-1.5"><span>📞</span>{shop.phone}</div>}</div>
+            {!customer && <p className="mt-2 text-xs text-stone-400">Book in seconds — no app, no account needed.</p>}
+            {customer && <p className="mt-2 text-xs text-emerald-600">Welcome back, {customer.profile?.name || "friend"}!</p>}
           </div>
         </div>
 
@@ -119,31 +129,33 @@ export default function ShopBooking() {
 
         {showHistory && customer && (<div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-stone-200"><div className="flex items-center justify-between"><h2 className="font-semibold">Your past bookings</h2><button onClick={() => setShowHistory(false)} className="text-sm text-stone-500">Close</button></div>{history.length === 0 ? <p className="mt-2 text-sm text-stone-500">No bookings yet.</p> : <div className="mt-2 space-y-2">{history.map((b) => (<div key={b.id} className="rounded-xl bg-stone-50 p-3 text-sm ring-1 ring-stone-200"><div className="font-medium">{b.service} with {b.barber}</div><div className="text-stone-500">{b.day} at {b.slot} · ${b.price}</div></div>))}</div>}</div>)}
 
-        {step === "service" && (<><h2 className="mt-6 mb-3 text-lg font-semibold">Choose a service</h2>{services.length === 0 ? <p className="rounded-xl bg-white p-4 text-stone-500 ring-1 ring-stone-200">This shop hasn't added services yet.</p> : <div className="space-y-2">{services.map((s) => (<button key={s.id} onClick={() => { setService(s); setStep("barber"); }} className="flex w-full items-center justify-between rounded-xl bg-white p-4 text-left ring-1 ring-stone-200 transition hover:ring-emerald-400"><div><div className="font-medium">{s.name}</div><div className="text-sm text-stone-500">{s.mins} min</div></div><div className="text-lg font-semibold">${s.price}</div></button>))}</div>}</>)}
+        {step === "service" && (<><h2 className="mt-6 mb-3 text-lg font-semibold">Choose a service</h2>{services.length === 0 ? <p className="rounded-xl bg-white p-4 text-stone-500 ring-1 ring-stone-200">This shop hasn't added services yet.</p> : <div className="space-y-2">{services.map((s) => (<button key={s.id} onClick={() => { setService(s); setStep("barber"); }} className="flex w-full items-start justify-between rounded-xl bg-white p-4 text-left ring-1 ring-stone-200 transition hover:ring-emerald-400"><div className="pr-3"><div className="font-medium">{s.name}</div><div className="text-sm text-stone-500">{s.mins} min</div>{s.description && <div className="mt-1 text-sm text-stone-400">{s.description}</div>}</div><div className="shrink-0 text-lg font-semibold">${s.price}</div></button>))}</div>}</>)}
 
-        {/* BARBER step with photo + bio */}
+        {/* BARBER step with photo + bio + work gallery */}
         {step === "barber" && (
           <>
             <button onClick={() => setStep("service")} className="mt-6 text-sm font-medium text-stone-500">← Back</button>
             <h2 className="mt-2 mb-1 text-lg font-semibold">Pick your barber</h2>
             {staff.length === 0 ? <p className="mt-3 rounded-xl bg-white p-4 text-stone-500 ring-1 ring-stone-200">This shop hasn't added barbers yet.</p>
-            : <div className="space-y-3">
-                {staff.map((b) => (
-                  <div key={b.id} className="rounded-2xl bg-white p-4 ring-1 ring-stone-200">
-                    <div className="flex items-start gap-3">
-                      <div className={`grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl ${b.color || "bg-emerald-700"} text-xl font-semibold text-white`}>
-                        {b.photo_url ? <img src={b.photo_url} alt={b.name} className="h-full w-full object-cover" /> : b.name[0]}
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-semibold">{b.name}</div>
-                        {b.specialty && <span className="mt-0.5 inline-block rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">{b.specialty}</span>}
-                        {b.bio && <p className="mt-1.5 text-sm leading-relaxed text-stone-500">{b.bio}</p>}
+            : <div className="space-y-3">{staff.map((b) => (
+                <div key={b.id} className="rounded-2xl bg-white p-4 ring-1 ring-stone-200">
+                  <div className="flex items-start gap-3">
+                    <div className={`grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl ${b.color || "bg-emerald-700"} text-xl font-semibold text-white`}>{b.photo_url ? <img src={b.photo_url} alt={b.name} className="h-full w-full object-cover" /> : b.name[0]}</div>
+                    <div className="flex-1"><div className="font-semibold">{b.name}</div>{b.specialty && <span className="mt-0.5 inline-block rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">{b.specialty}</span>}{b.bio && <p className="mt-1.5 text-sm leading-relaxed text-stone-500">{b.bio}</p>}</div>
+                  </div>
+                  {(b.work_photos || []).length > 0 && (
+                    <div className="mt-3">
+                      <div className="mb-1 text-xs font-medium text-stone-400">Their work</div>
+                      <div className="flex gap-2 overflow-x-auto pb-1">
+                        {b.work_photos.map((url, i) => (
+                          <img key={i} src={url} alt="work" onClick={() => setLightbox(url)}
+                            className="h-20 w-20 shrink-0 cursor-pointer rounded-lg object-cover ring-1 ring-stone-200" />
+                        ))}
                       </div>
                     </div>
-                    <button onClick={() => { setBarber(b); setDate(null); setSlot(null); setStep("time"); }} className="mt-3 w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">Book with {b.name}</button>
-                  </div>
-                ))}
-              </div>}
+                  )}
+                  <button onClick={() => { setBarber(b); setDate(null); setSlot(null); setStep("time"); }} className="mt-3 w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">Book with {b.name}</button>
+                </div>))}</div>}
           </>
         )}
 
