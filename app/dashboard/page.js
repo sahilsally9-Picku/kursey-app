@@ -5,27 +5,30 @@ import { supabase } from "../../lib/supabase";
 import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
+  const [checking, setChecking] = useState(true);
+  const [shop, setShop] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [checking, setChecking] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
     async function init() {
-      // 1. check if logged in
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push("/login");
-        return;
-      }
+      if (!session) { router.push("/login"); return; }
+
+      // find THIS owner's shop
+      const { data: shopData } = await supabase
+        .from("shops").select("*").eq("owner_id", session.user.id).limit(1).single();
+      if (!shopData) { router.push("/signup"); return; }
+      setShop(shopData);
       setChecking(false);
 
-      // 2. load bookings
-      const { data, error } = await supabase
-        .from("bookings")
-        .select("*")
+      // load ONLY this shop's bookings
+      const { data } = await supabase
+        .from("bookings").select("*")
+        .eq("shop_id", shopData.id)
         .order("created_at", { ascending: false });
-      if (!error) setBookings(data);
+      setBookings(data || []);
       setLoading(false);
     }
     init();
@@ -38,22 +41,26 @@ export default function Dashboard() {
 
   const revenue = bookings.reduce((sum, b) => sum + (b.price || 0), 0);
 
-  if (checking) {
-    return <div className="flex min-h-screen items-center justify-center bg-stone-100 text-stone-500">Loading…</div>;
-  }
+  if (checking) return <div className="flex min-h-screen items-center justify-center bg-stone-100 text-stone-500">Loading…</div>;
 
   return (
     <div className="min-h-screen bg-stone-100 text-stone-900">
       <div className="mx-auto max-w-2xl px-4 py-8">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Fade &amp; Co — Dashboard</h1>
-            <p className="text-sm text-stone-500">Every booking that comes in.</p>
+            <h1 className="text-2xl font-bold">{shop.name}</h1>
+            <p className="text-sm text-stone-500">kursey.com/{shop.slug}</p>
           </div>
-          <button onClick={handleLogout}
-            className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-300">
-            Log out
-          </button>
+          <div className="flex items-center gap-2">
+            <a href="/settings" className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-300">Settings</a>
+            <button onClick={handleLogout} className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-300">Log out</button>
+          </div>
+        </div>
+
+        {/* your booking link */}
+        <div className="mt-4 rounded-2xl bg-emerald-600 p-4 text-white">
+          <div className="text-sm text-emerald-100">Your booking link — share this with clients</div>
+          <div className="mt-1 text-lg font-semibold">kursey.com/{shop.slug}</div>
         </div>
 
         {/* stats */}
@@ -74,7 +81,7 @@ export default function Dashboard() {
           <p className="text-stone-500">Loading…</p>
         ) : bookings.length === 0 ? (
           <p className="rounded-xl bg-white p-4 text-stone-500 ring-1 ring-stone-200">
-            No bookings yet. Make one on the booking page and refresh.
+            No bookings yet. Share your booking link to get started.
           </p>
         ) : (
           <div className="space-y-2">
