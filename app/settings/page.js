@@ -42,6 +42,11 @@ function SettingsInner() {
   const [stBreaks, setStBreaks] = useState([]); const [brStart, setBrStart] = useState("13:00"); const [brEnd, setBrEnd] = useState("14:00");
   const [editStaffId, setEditStaffId] = useState(null);
 
+  // barber login state
+  const [loginFor, setLoginFor] = useState(null); // staff id we're setting a login for
+  const [loginEmail, setLoginEmail] = useState(""); const [loginPass, setLoginPass] = useState("");
+  const [creatingLogin, setCreatingLogin] = useState(false);
+
   useEffect(() => {
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
@@ -71,10 +76,7 @@ function SettingsInner() {
   async function connectStripe() {
     setConnecting(true);
     try {
-      const res = await fetch("/api/connect-stripe", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shopId: shop.id, origin: window.location.origin }),
-      });
+      const res = await fetch("/api/connect-stripe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shopId: shop.id, origin: window.location.origin }) });
       const data = await res.json();
       if (data.url) { window.location.href = data.url; }
       else { alert("Couldn't start Stripe connect: " + (data.error || "unknown error")); setConnecting(false); }
@@ -86,7 +88,6 @@ function SettingsInner() {
     await supabase.from("shops").update({ deposits_enabled: newVal }).eq("id", shop.id);
     setShop({ ...shop, deposits_enabled: newVal });
   }
-
   async function saveDeposit() {
     setSavingDep(true); setDepSaved(false);
     await supabase.from("shops").update({ deposit_amount: parseInt(depAmount) || 0 }).eq("id", shop.id);
@@ -135,6 +136,22 @@ function SettingsInner() {
   }
   async function deleteStaff(id) { await supabase.from("staff").delete().eq("id", id); if (editStaffId === id) resetStaffForm(); loadStaff(shop.id); }
 
+  function openLoginForm(st) { setLoginFor(st.id); setLoginEmail(st.login_email || ""); setLoginPass(""); }
+  async function createBarberLogin() {
+    if (!loginEmail || !loginPass) { alert("Enter an email and password."); return; }
+    setCreatingLogin(true);
+    try {
+      const res = await fetch("/api/create-barber-login", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ staffId: loginFor, shopId: shop.id, email: loginEmail, password: loginPass }),
+      });
+      const data = await res.json();
+      if (data.ok) { setLoginFor(null); setLoginEmail(""); setLoginPass(""); loadStaff(shop.id); alert("Barber login created! They can now log in at kursey.com/login with that email and password."); }
+      else { alert("Couldn't create login: " + (data.error || "unknown")); }
+    } catch (err) { alert("Error: " + err.message); }
+    setCreatingLogin(false);
+  }
+
   if (checking) return <div className="flex min-h-screen items-center justify-center bg-stone-100 text-stone-500">Loading…</div>;
 
   const input = "w-full rounded-xl bg-white px-4 py-3 text-sm text-stone-900 outline-none ring-1 ring-stone-300 placeholder:text-stone-400 focus:ring-emerald-500";
@@ -164,17 +181,9 @@ function SettingsInner() {
               <div className="flex items-center gap-2 text-sm font-medium text-emerald-700">✓ Stripe connected</div>
               <div className="mt-3 flex items-center justify-between rounded-xl bg-stone-50 p-3 ring-1 ring-stone-200">
                 <div><div className="font-medium">Require a deposit to book</div><div className="text-xs text-stone-500">Customers pay upfront to confirm.</div></div>
-                <button onClick={toggleDeposits} className={`relative h-6 w-11 rounded-full transition ${shop.deposits_enabled ? "bg-emerald-600" : "bg-stone-300"}`}>
-                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${shop.deposits_enabled ? "left-[22px]" : "left-0.5"}`} />
-                </button>
+                <button onClick={toggleDeposits} className={`relative h-6 w-11 rounded-full transition ${shop.deposits_enabled ? "bg-emerald-600" : "bg-stone-300"}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${shop.deposits_enabled ? "left-[22px]" : "left-0.5"}`} /></button>
               </div>
-              {shop.deposits_enabled && (
-                <div className="mt-3 flex items-end gap-2">
-                  <div><div className="mb-1 text-xs font-medium text-stone-500">Deposit amount ($)</div><input value={depAmount} onChange={(e) => setDepAmount(e.target.value)} type="number" className={`${input} w-32`} /></div>
-                  <button onClick={saveDeposit} disabled={savingDep} className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">{savingDep ? "Saving…" : "Save"}</button>
-                  {depSaved && <span className="pb-3 text-sm font-medium text-emerald-600">Saved ✓</span>}
-                </div>
-              )}
+              {shop.deposits_enabled && (<div className="mt-3 flex items-end gap-2"><div><div className="mb-1 text-xs font-medium text-stone-500">Deposit amount ($)</div><input value={depAmount} onChange={(e) => setDepAmount(e.target.value)} type="number" className={`${input} w-32`} /></div><button onClick={saveDeposit} disabled={savingDep} className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">{savingDep ? "Saving…" : "Save"}</button>{depSaved && <span className="pb-3 text-sm font-medium text-emerald-600">Saved ✓</span>}</div>)}
               <button onClick={connectStripe} className="mt-3 block text-xs text-stone-400 hover:underline">Re-open Stripe setup</button>
             </>
           )}
@@ -220,7 +229,29 @@ function SettingsInner() {
           </div>
           <div className="mt-3 flex gap-2"><button disabled={!stName} onClick={saveStaff} className="flex-1 rounded-xl bg-emerald-600 py-3 font-semibold text-white transition enabled:hover:bg-emerald-700 disabled:opacity-40">{editStaffId ? "Save changes" : "Add barber"}</button>{editStaffId && <button onClick={resetStaffForm} className="rounded-xl bg-stone-200 px-4 py-3 text-sm font-medium text-stone-700">Cancel</button>}</div>
         </div>
-        {staff.length > 0 && <div className="mt-2 space-y-2">{staff.map((st) => (<div key={st.id} className="flex items-center justify-between rounded-xl bg-white p-4 ring-1 ring-stone-200"><div className="flex items-center gap-3"><div className={`grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full ${st.color || "bg-emerald-700"} font-semibold text-white`}>{st.photo_url ? <img src={st.photo_url} alt="" className="h-full w-full object-cover" /> : st.name[0]}</div><div><div className="font-medium">{st.name}</div><div className="text-xs text-stone-500">{(st.work_photos || []).length} work photo{(st.work_photos || []).length === 1 ? "" : "s"}</div></div></div><div className="flex items-center gap-3"><button onClick={() => startEditStaff(st)} className="text-sm text-emerald-700 hover:underline">Edit</button><button onClick={() => deleteStaff(st.id)} className="text-sm text-red-600 hover:underline">Remove</button></div></div>))}</div>}
+        {staff.length > 0 && <div className="mt-2 space-y-2">{staff.map((st) => (
+          <div key={st.id} className="rounded-xl bg-white p-4 ring-1 ring-stone-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full ${st.color || "bg-emerald-700"} font-semibold text-white`}>{st.photo_url ? <img src={st.photo_url} alt="" className="h-full w-full object-cover" /> : st.name[0]}</div>
+                <div><div className="font-medium">{st.name}</div><div className="text-xs text-stone-500">{st.login_email ? `Login: ${st.login_email}` : "No login yet"}</div></div>
+              </div>
+              <div className="flex items-center gap-3"><button onClick={() => startEditStaff(st)} className="text-sm text-emerald-700 hover:underline">Edit</button><button onClick={() => deleteStaff(st.id)} className="text-sm text-red-600 hover:underline">Remove</button></div>
+            </div>
+            <div className="mt-2 border-t border-stone-100 pt-2">
+              {loginFor === st.id ? (
+                <div className="space-y-2">
+                  <div className="text-xs font-medium text-stone-500">{st.login_email ? "Reset this barber's login" : "Create a login for this barber"}</div>
+                  <input value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder="Barber's email" type="email" className={input} />
+                  <input value={loginPass} onChange={(e) => setLoginPass(e.target.value)} placeholder="Password (min 6)" type="password" className={input} />
+                  <div className="flex gap-2"><button onClick={createBarberLogin} disabled={creatingLogin} className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{creatingLogin ? "Creating…" : "Create login"}</button><button onClick={() => setLoginFor(null)} className="rounded-xl bg-stone-200 px-4 py-2.5 text-sm font-medium text-stone-700">Cancel</button></div>
+                </div>
+              ) : (
+                <button onClick={() => openLoginForm(st)} className="text-sm font-medium text-indigo-700 hover:underline">{st.login_email ? "Reset login" : "+ Set up login"}</button>
+              )}
+            </div>
+          </div>
+        ))}</div>}
       </div>
     </div>
   );

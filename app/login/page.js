@@ -14,21 +14,23 @@ export default function Login() {
   async function handleLogin() {
     setLoading(true);
     setError("");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) { setLoading(false); setError(error.message); return; }
+
+    const userId = signInData.user.id;
+    // is this user a barber? (linked staff row)
+    const { data: staffRow } = await supabase.from("staff").select("id").eq("user_id", userId).limit(1).single();
     setLoading(false);
-    if (error) {
-      setError(error.message);
-    } else {
-      router.push("/dashboard");
-    }
+    if (staffRow) { router.push("/barber"); }
+    else { router.push("/dashboard"); }
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-stone-100 px-4">
       <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-200">
         <div className="mb-4 grid h-12 w-12 place-items-center rounded-xl bg-emerald-600 text-xl font-bold text-white">K</div>
-        <h1 className="text-xl font-bold text-stone-900">Owner login</h1>
-        <p className="mb-4 text-sm text-stone-500">Sign in to see your bookings.</p>
+        <h1 className="text-xl font-bold text-stone-900">Log in</h1>
+        <p className="mb-4 text-sm text-stone-500">Owners and barbers sign in here.</p>
 
         <div className="space-y-2">
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email"

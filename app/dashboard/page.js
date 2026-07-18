@@ -38,6 +38,7 @@ export default function Dashboard() {
   const [bStart, setBStart] = useState("720"); const [bEnd, setBEnd] = useState("780");
   const [blocking, setBlocking] = useState(false);
   const [refunding, setRefunding] = useState(null);
+  const [copied, setCopied] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -76,6 +77,11 @@ export default function Dashboard() {
   }
 
   async function handleLogout() { await supabase.auth.signOut(); router.push("/login"); }
+
+  function copyLink() {
+    navigator.clipboard.writeText(`https://kursey.com/${shop.slug}`);
+    setCopied(true); setTimeout(() => setCopied(false), 1500);
+  }
 
   async function subscribe() {
     setSubscribing(true);
@@ -128,11 +134,8 @@ export default function Dashboard() {
     const { error } = await supabase.from("bookings").update({ status: "cancelled" }).eq("id", b.id);
     if (error) { alert("Couldn't cancel: " + error.message); return; }
     setBookings((prev) => prev.map((x) => x.id === b.id ? { ...x, status: "cancelled" } : x));
-    // offer a refund if there's an unrefunded deposit with a payment record
     if (b.deposit_paid && !b.deposit_refunded && b.stripe_payment_intent) {
-      if (confirm(`Refund the $${b.deposit_amount} deposit to the customer?`)) {
-        refundDeposit(b.id);
-      }
+      if (confirm(`Refund the $${b.deposit_amount} deposit to the customer?`)) { refundDeposit(b.id); }
     }
   }
 
@@ -221,7 +224,14 @@ export default function Dashboard() {
         : status === "past_due" ? (<div className="mt-4 rounded-2xl bg-red-50 p-4 ring-1 ring-red-200"><div className="font-semibold text-red-800">Payment needed</div><div className="text-sm text-red-700">Your booking page is paused until you subscribe.</div><button onClick={subscribe} disabled={subscribing} className="mt-3 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{subscribing ? "Opening…" : "Subscribe now"}</button></div>)
         : (<div className="mt-4 rounded-2xl bg-indigo-50 p-4 ring-1 ring-indigo-200"><div className="font-semibold text-indigo-900">Free trial — {daysLeft} day{daysLeft === 1 ? "" : "s"} left</div><div className="text-sm text-indigo-700">Subscribe any time to keep your booking page live after the trial.</div><button onClick={subscribe} disabled={subscribing} className="mt-3 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{subscribing ? "Opening…" : "Subscribe — $34.99/mo"}</button></div>)}
 
-        <div className="mt-4 rounded-2xl bg-emerald-600 p-4 text-white"><div className="text-sm text-emerald-100">Your booking link — share this with clients</div><div className="mt-1 text-lg font-semibold">kursey.com/{shop.slug}</div></div>
+        {/* BOOKING LINK + COPY */}
+        <div className="mt-4 rounded-2xl bg-emerald-600 p-4 text-white">
+          <div className="text-sm text-emerald-100">Your booking link — share this with clients</div>
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <div className="text-lg font-semibold">kursey.com/{shop.slug}</div>
+            <button onClick={copyLink} className="shrink-0 rounded-lg bg-white/20 px-3 py-1.5 text-sm font-semibold text-white ring-1 ring-white/30 hover:bg-white/30">{copied ? "Copied ✓" : "Copy link"}</button>
+          </div>
+        </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3">
           <div className="rounded-2xl bg-white p-4 ring-1 ring-stone-200"><div className="text-3xl font-bold">{totalBookings}</div><div className="text-sm text-stone-500">Total bookings</div></div>
