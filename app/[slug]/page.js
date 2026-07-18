@@ -90,7 +90,7 @@ export default function ShopBooking() {
       const [srv, stf, rev] = await Promise.all([
         supabase.from("services").select("*").eq("shop_id", shopData.id).order("created_at", { ascending: true }),
         supabase.from("staff").select("*").eq("shop_id", shopData.id).order("created_at", { ascending: true }),
-        supabase.from("reviews").select("*").eq("shop_id", shopData.id).order("created_at", { ascending: false }),
+        supabase.from("reviews").select("*").eq("shop_id", shopData.id).neq("hidden", true).order("created_at", { ascending: false }),
       ]);
       if (srv.data) setServices(srv.data); if (stf.data) setStaff(stf.data); if (rev.data) setReviews(rev.data);
       const { data: { session } } = await supabase.auth.getSession();
@@ -149,7 +149,7 @@ export default function ShopBooking() {
     if (error) { setSavingReview(false); alert("Couldn't save review: " + error.message); return; }
     await supabase.from("bookings").update({ reviewed: true }).eq("id", booking.id);
     setHistory((prev) => prev.map((b) => b.id === booking.id ? { ...b, reviewed: true } : b));
-    const { data: rev } = await supabase.from("reviews").select("*").eq("shop_id", shop.id).order("created_at", { ascending: false });
+    const { data: rev } = await supabase.from("reviews").select("*").eq("shop_id", shop.id).neq("hidden", true).order("created_at", { ascending: false });
     setReviews(rev || []);
     setReviewFor(null); setRStars(5); setRComment(""); setSavingReview(false);
   }
@@ -178,7 +178,6 @@ export default function ShopBooking() {
     }).select("id").single();
     setSaving(false);
     if (error) { alert("Something went wrong: " + error.message); return false; }
-    // fire the confirmation email (don't block the UI on it)
     if (inserted?.id && email) {
       fetch("/api/send-confirmation", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -326,7 +325,7 @@ export default function ShopBooking() {
                 </div>
               </div>
               {(b.work_photos || []).length > 0 && (<div className="mt-3"><div className="mb-1 text-xs font-medium text-stone-400">Their work</div><div className="flex gap-2 overflow-x-auto pb-1">{b.work_photos.map((url, i) => (<img key={i} src={url} alt="work" onClick={() => setLightbox(url)} className="h-20 w-20 shrink-0 cursor-pointer rounded-lg object-cover ring-1 ring-stone-200" />))}</div></div>)}
-              {brevs.length > 0 && (<div className="mt-3 border-t border-stone-100 pt-3"><div className="mb-1 text-xs font-medium text-stone-400">Reviews</div><div className="space-y-2">{brevs.slice(0, 3).map((r) => (<div key={r.id} className="rounded-lg bg-stone-50 p-2 ring-1 ring-stone-200"><div className="flex items-center justify-between"><span className="text-xs font-medium text-stone-700">{r.customer_name}</span><Stars value={r.rating} size="text-xs" /></div>{r.comment && <p className="mt-0.5 text-xs text-stone-500">{r.comment}</p>}</div>))}</div></div>)}
+              {brevs.length > 0 && (<div className="mt-3 border-t border-stone-100 pt-3"><div className="mb-1 text-xs font-medium text-stone-400">Reviews</div><div className="space-y-2">{brevs.slice(0, 3).map((r) => (<div key={r.id} className="rounded-lg bg-stone-50 p-2 ring-1 ring-stone-200"><div className="flex items-center justify-between"><span className="text-xs font-medium text-stone-700">{r.customer_name}</span><Stars value={r.rating} size="text-xs" /></div>{r.comment && <p className="mt-0.5 text-xs text-stone-500">{r.comment}</p>}{r.owner_reply && <div className="mt-1 rounded bg-emerald-50 p-1.5 text-xs text-emerald-800"><span className="font-semibold">{shop.name}:</span> {r.owner_reply}</div>}</div>))}</div></div>)}
               <button onClick={() => { setBarber(b); setDate(null); setSlot(null); setStep("time"); }} className="mt-3 w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">Book with {b.name}</button>
             </div>
           );

@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [bookings, setBookings] = useState([]);
   const [staff, setStaff] = useState([]);
   const [services, setServices] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState(false);
   const [showCampaign, setShowCampaign] = useState(false);
@@ -39,6 +40,8 @@ export default function Dashboard() {
   const [blocking, setBlocking] = useState(false);
   const [refunding, setRefunding] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [showReviews, setShowReviews] = useState(false);
+  const [replyFor, setReplyFor] = useState(null); const [replyText, setReplyText] = useState(""); const [savingReply, setSavingReply] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -60,12 +63,14 @@ export default function Dashboard() {
       }
 
       await refreshBookings(shopData.id);
-      const [stf, srv] = await Promise.all([
+      const [stf, srv, rev] = await Promise.all([
         supabase.from("staff").select("*").eq("shop_id", shopData.id),
         supabase.from("services").select("*").eq("shop_id", shopData.id).order("created_at", { ascending: true }),
+        supabase.from("reviews").select("*").eq("shop_id", shopData.id).order("created_at", { ascending: false }),
       ]);
       setStaff(stf.data || []);
       setServices(srv.data || []);
+      setReviews(rev.data || []);
       setLoading(false);
     }
     init();
@@ -144,6 +149,23 @@ export default function Dashboard() {
     const { error } = await supabase.from("bookings").update({ status: "cancelled" }).eq("id", id);
     if (error) { alert("Couldn't remove: " + error.message); return; }
     setBookings((prev) => prev.map((b) => b.id === id ? { ...b, status: "cancelled" } : b));
+  }
+
+  // ---- REVIEWS: reply + hide ----
+  function openReply(r) { setReplyFor(r.id); setReplyText(r.owner_reply || ""); }
+  async function saveReply(id) {
+    setSavingReply(true);
+    const { error } = await supabase.from("reviews").update({ owner_reply: replyText }).eq("id", id);
+    setSavingReply(false);
+    if (error) { alert("Couldn't save reply: " + error.message); return; }
+    setReviews((prev) => prev.map((r) => r.id === id ? { ...r, owner_reply: replyText } : r));
+    setReplyFor(null); setReplyText("");
+  }
+  async function toggleHidden(r) {
+    const newVal = !r.hidden;
+    const { error } = await supabase.from("reviews").update({ hidden: newVal }).eq("id", r.id);
+    if (error) { alert("Couldn't update: " + error.message); return; }
+    setReviews((prev) => prev.map((x) => x.id === r.id ? { ...x, hidden: newVal } : x));
   }
 
   async function addBooking() {
@@ -264,6 +286,37 @@ export default function Dashboard() {
         <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-stone-200">
           <div className="flex items-center justify-between"><div><div className="font-semibold">Automatic rebooking reminders</div><div className="text-sm text-stone-500">Nudge clients who haven't visited in a while.</div></div><button onClick={toggleRebooking} className={`relative h-6 w-11 rounded-full transition ${shop.rebooking_enabled ? "bg-emerald-600" : "bg-stone-300"}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${shop.rebooking_enabled ? "left-[22px]" : "left-0.5"}`} /></button></div>
           {shop.rebooking_enabled && (<div className="mt-3 flex items-end gap-2"><div><div className="mb-1 text-xs font-medium text-stone-500">Send after (weeks since last visit)</div><input value={rebookWeeks} onChange={(e) => setRebookWeeks(e.target.value)} type="number" min="1" className="w-32 rounded-xl bg-white px-4 py-3 text-sm text-stone-900 outline-none ring-1 ring-stone-300 focus:ring-emerald-500" /></div><button onClick={saveRebookWeeks} disabled={savingRebook} className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">{savingRebook ? "Saving…" : "Save"}</button>{rebookSaved && <span className="pb-3 text-sm font-medium text-emerald-600">Saved ✓</span>}</div>)}
+        </div>
+
+        {/* REVIEWS MANAGER */}
+        <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-stone-200">
+          <div className="flex items-center justify-between"><div><div className="font-semibold">Reviews ({reviews.length})</div><div className="text-sm text-stone-500">Reply to or hide customer reviews.</div></div><button onClick={() => setShowReviews(!showReviews)} className="rounded-lg bg-amber-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-amber-600">{showReviews ? "Close" : "Manage"}</button></div>
+          {showReviews && (
+            reviews.length === 0 ? <p className="mt-3 text-sm text-stone-500">No reviews yet.</p> : <div className="mt-3 space-y-2">{reviews.map((r) => (
+              <div key={r.id} className={`rounded-xl p-3 ring-1 ${r.hidden ? "bg-stone-100 ring-stone-200 opacity-70" : "bg-stone-50 ring-stone-200"}`}>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2"><span className="text-sm font-medium">{r.customer_name}</span><span className="text-amber-500">{"★".repeat(r.rating || 0)}<span className="text-stone-300">{"★".repeat(5 - (r.rating || 0))}</span></span></div>
+                    <div className="text-xs text-stone-400">for {r.barber}</div>
+                    {r.comment && <p className="mt-1 text-sm text-stone-600">{r.comment}</p>}
+                  </div>
+                  {r.hidden && <span className="shrink-0 rounded-full bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-600">Hidden</span>}
+                </div>
+                {r.owner_reply && replyFor !== r.id && (<div className="mt-2 rounded-lg bg-emerald-50 p-2 text-xs text-emerald-800 ring-1 ring-emerald-200"><span className="font-semibold">Your reply:</span> {r.owner_reply}</div>)}
+                {replyFor === r.id ? (
+                  <div className="mt-2">
+                    <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} placeholder="Write a public reply…" rows={2} className={`${inputCls} resize-none`} />
+                    <div className="mt-2 flex gap-2"><button onClick={() => saveReply(r.id)} disabled={savingReply} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40">{savingReply ? "Saving…" : "Save reply"}</button><button onClick={() => { setReplyFor(null); setReplyText(""); }} className="rounded-lg bg-stone-200 px-3 py-1.5 text-xs font-medium text-stone-700">Cancel</button></div>
+                  </div>
+                ) : (
+                  <div className="mt-2 flex gap-3">
+                    <button onClick={() => openReply(r)} className="text-xs font-medium text-emerald-700 hover:underline">{r.owner_reply ? "Edit reply" : "Reply"}</button>
+                    <button onClick={() => toggleHidden(r)} className="text-xs font-medium text-stone-500 hover:underline">{r.hidden ? "Unhide" : "Hide"}</button>
+                  </div>
+                )}
+              </div>
+            ))}</div>
+          )}
         </div>
 
         <h2 className="mt-6 mb-2 text-lg font-semibold">What Kursey is doing for you</h2>
