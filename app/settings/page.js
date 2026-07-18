@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const colors = [
   { label: "Green", value: "bg-emerald-700" }, { label: "Amber", value: "bg-amber-600" },
@@ -18,7 +18,12 @@ export default function Settings() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingWork, setUploadingWork] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [depAmount, setDepAmount] = useState(10);
+  const [savingDep, setSavingDep] = useState(false);
+  const [depSaved, setDepSaved] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [bName, setBName] = useState(""); const [bDesc, setBDesc] = useState("");
   const [bAddress, setBAddress] = useState(""); const [bPhone, setBPhone] = useState("");
@@ -45,6 +50,7 @@ export default function Settings() {
       if (!shopData) { router.push("/signup"); return; }
       setShop(shopData);
       setBName(shopData.name || ""); setBDesc(shopData.description || ""); setBAddress(shopData.address || ""); setBPhone(shopData.phone || "");
+      setDepAmount(shopData.deposit_amount || 10);
       setChecking(false);
       loadServices(shopData.id); loadStaff(shopData.id);
     }
@@ -60,6 +66,34 @@ export default function Settings() {
     const { error } = await supabase.storage.from("images").upload(path, file, { upsert: true });
     if (error) throw error;
     return supabase.storage.from("images").getPublicUrl(path).data.publicUrl;
+  }
+
+  // ---------- STRIPE / DEPOSITS ----------
+  async function connectStripe() {
+    setConnecting(true);
+    try {
+      const res = await fetch("/api/connect-stripe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shopId: shop.id, origin: window.location.origin }),
+      });
+      const data = await res.json();
+      if (data.url) { window.location.href = data.url; }
+      else { alert("Couldn't start Stripe connect: " + (data.error || "unknown error")); setConnecting(false); }
+    } catch (err) { alert("Error: " + err.message); setConnecting(false); }
+  }
+
+  async function toggleDeposits() {
+    const newVal = !shop.deposits_enabled;
+    await supabase.from("shops").update({ deposits_enabled: newVal }).eq("id", shop.id);
+    setShop({ ...shop, deposits_enabled: newVal });
+  }
+
+  async function saveDeposit() {
+    setSavingDep(true); setDepSaved(false);
+    await supabase.from("shops").update({ deposit_amount: parseInt(depAmount) || 0 }).eq("id", shop.id);
+    setShop({ ...shop, deposit_amount: parseInt(depAmount) || 0 });
+    setSavingDep(false); setDepSaved(true); setTimeout(() => setDepSaved(false), 2000);
   }
 
   async function saveInfo() {
@@ -107,6 +141,8 @@ export default function Settings() {
 
   const input = "w-full rounded-xl bg-white px-4 py-3 text-sm text-stone-900 outline-none ring-1 ring-stone-300 placeholder:text-stone-400 focus:ring-emerald-500";
   const select = "rounded-xl bg-white px-3 py-3 text-sm text-stone-900 outline-none ring-1 ring-stone-300 focus:ring-emerald-500";
+  const connected = !!shop.stripe_account_id;
+  const justReturned = searchParams.get("stripe") === "done";
 
   return (
     <div className="min-h-screen bg-stone-100 text-stone-900">
@@ -116,15 +152,40 @@ export default function Settings() {
           <a href="/dashboard" className="text-sm font-medium text-emerald-700 hover:underline">← Dashboard</a>
         </div>
 
-        {/* BUSINESS INFO */}
-        <h2 className="mt-6 mb-2 text-lg font-semibold">Business info</h2>
+        {/* PAYMENTS / DEPOSITS */}
+        <h2 className="mt-6 mb-2 text-lg font-semibold">Payments &amp; deposits</h2>
         <div className="rounded-2xl bg-white p-4 ring-1 ring-stone-200">
-          <div className="space-y-2">
-            <input value={bName} onChange={(e) => setBName(e.target.value)} placeholder="Business name" className={input} />
-            <textarea value={bDesc} onChange={(e) => setBDesc(e.target.value)} placeholder="Describe your business" rows={3} className={`${input} resize-none`} />
-            <input value={bAddress} onChange={(e) => setBAddress(e.target.value)} placeholder="Address" className={input} />
-            <input value={bPhone} onChange={(e) => setBPhone(e.target.value)} placeholder="Phone" className={input} />
-          </div>
+          {justReturned && <p className="mb-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">Returned from Stripe. If setup is complete, you're ready to take deposits.</p>}
+          {!connected ? (
+            <>
+              <p className="text-sm text-stone-600">Connect your Stripe to take deposits. Money goes straight to your account — Kursey never touches it.</p>
+              <button onClick={connectStripe} disabled={connecting} className="mt-3 rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white transition enabled:hover:bg-indigo-700 disabled:opacity-40">{connecting ? "Opening Stripe…" : "Connect Stripe"}</button>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 text-sm font-medium text-emerald-700">✓ Stripe connected</div>
+              <div className="mt-3 flex items-center justify-between rounded-xl bg-stone-50 p-3 ring-1 ring-stone-200">
+                <div><div className="font-medium">Require a deposit to book</div><div className="text-xs text-stone-500">Customers pay upfront to confirm.</div></div>
+                <button onClick={toggleDeposits} className={`relative h-6 w-11 rounded-full transition ${shop.deposits_enabled ? "bg-emerald-600" : "bg-stone-300"}`}>
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${shop.deposits_enabled ? "left-[22px]" : "left-0.5"}`} />
+                </button>
+              </div>
+              {shop.deposits_enabled && (
+                <div className="mt-3 flex items-end gap-2">
+                  <div><div className="mb-1 text-xs font-medium text-stone-500">Deposit amount ($)</div><input value={depAmount} onChange={(e) => setDepAmount(e.target.value)} type="number" className={`${input} w-32`} /></div>
+                  <button onClick={saveDeposit} disabled={savingDep} className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">{savingDep ? "Saving…" : "Save"}</button>
+                  {depSaved && <span className="pb-3 text-sm font-medium text-emerald-600">Saved ✓</span>}
+                </div>
+              )}
+              <button onClick={connectStripe} className="mt-3 block text-xs text-stone-400 hover:underline">Re-open Stripe setup</button>
+            </>
+          )}
+        </div>
+
+        {/* BUSINESS INFO */}
+        <h2 className="mt-8 mb-2 text-lg font-semibold">Business info</h2>
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-stone-200">
+          <div className="space-y-2"><input value={bName} onChange={(e) => setBName(e.target.value)} placeholder="Business name" className={input} /><textarea value={bDesc} onChange={(e) => setBDesc(e.target.value)} placeholder="Describe your business" rows={3} className={`${input} resize-none`} /><input value={bAddress} onChange={(e) => setBAddress(e.target.value)} placeholder="Address" className={input} /><input value={bPhone} onChange={(e) => setBPhone(e.target.value)} placeholder="Phone" className={input} /></div>
           <div className="mt-3 flex items-center gap-3"><button disabled={savingInfo || !bName} onClick={saveInfo} className="rounded-xl bg-emerald-600 px-5 py-3 font-semibold text-white transition enabled:hover:bg-emerald-700 disabled:opacity-40">{savingInfo ? "Saving…" : "Save info"}</button>{infoSaved && <span className="text-sm font-medium text-emerald-600">Saved ✓</span>}</div>
         </div>
 
@@ -153,24 +214,7 @@ export default function Settings() {
             <input value={stName} onChange={(e) => setStName(e.target.value)} placeholder="Name (e.g. Marcus)" className={input} />
             <input value={stSpecialty} onChange={(e) => setStSpecialty(e.target.value)} placeholder="Specialty" className={input} />
             <textarea value={stBio} onChange={(e) => setStBio(e.target.value)} placeholder="About this barber" rows={3} className={`${input} resize-none`} />
-
-            {/* work gallery */}
-            <div className="pt-1">
-              <div className="mb-1 text-xs font-medium text-stone-500">Work photos</div>
-              <div className="flex flex-wrap gap-2">
-                {stWork.map((url, i) => (
-                  <div key={i} className="relative h-16 w-16 overflow-hidden rounded-lg ring-1 ring-stone-200">
-                    <img src={url} alt="" className="h-full w-full object-cover" />
-                    <button onClick={() => removeWorkPhoto(i)} className="absolute right-0 top-0 grid h-5 w-5 place-items-center rounded-bl-lg bg-black/60 text-xs text-white">✕</button>
-                  </div>
-                ))}
-                <label className="grid h-16 w-16 cursor-pointer place-items-center rounded-lg bg-stone-100 text-2xl text-stone-400 ring-1 ring-dashed ring-stone-300 hover:bg-stone-200">
-                  {uploadingWork ? "…" : "+"}
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => uploadWorkPhoto(e.target.files[0])} disabled={uploadingWork} />
-                </label>
-              </div>
-            </div>
-
+            <div className="pt-1"><div className="mb-1 text-xs font-medium text-stone-500">Work photos</div><div className="flex flex-wrap gap-2">{stWork.map((url, i) => (<div key={i} className="relative h-16 w-16 overflow-hidden rounded-lg ring-1 ring-stone-200"><img src={url} alt="" className="h-full w-full object-cover" /><button onClick={() => removeWorkPhoto(i)} className="absolute right-0 top-0 grid h-5 w-5 place-items-center rounded-bl-lg bg-black/60 text-xs text-white">✕</button></div>))}<label className="grid h-16 w-16 cursor-pointer place-items-center rounded-lg bg-stone-100 text-2xl text-stone-400 ring-1 ring-dashed ring-stone-300 hover:bg-stone-200">{uploadingWork ? "…" : "+"}<input type="file" accept="image/*" className="hidden" onChange={(e) => uploadWorkPhoto(e.target.files[0])} disabled={uploadingWork} /></label></div></div>
             <div className="pt-1"><div className="mb-1 text-xs font-medium text-stone-500">Working days</div><div className="flex flex-wrap gap-1.5">{DAYS.map((d) => (<button key={d} onClick={() => toggleDay(d)} className={`rounded-lg px-3 py-1.5 text-sm ring-1 transition ${stDays.includes(d) ? "bg-emerald-600 text-white ring-emerald-600" : "bg-white text-stone-600 ring-stone-300"}`}>{d}</button>))}</div></div>
             <div className="flex items-center gap-2 pt-1"><div className="flex-1"><div className="mb-1 text-xs font-medium text-stone-500">Start</div><select value={stStart} onChange={(e) => setStStart(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div><div className="flex-1"><div className="mb-1 text-xs font-medium text-stone-500">End</div><select value={stEnd} onChange={(e) => setStEnd(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div></div>
             <div className="pt-1"><div className="mb-1 text-xs font-medium text-stone-500">Breaks (optional)</div><div className="flex items-end gap-2"><div className="flex-1"><select value={brStart} onChange={(e) => setBrStart(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div><span className="pb-3 text-stone-400">–</span><div className="flex-1"><select value={brEnd} onChange={(e) => setBrEnd(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div><button onClick={addBreakToForm} className="mb-0.5 rounded-xl bg-stone-800 px-3 py-3 text-sm font-semibold text-white">+ Break</button></div>{stBreaks.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{stBreaks.map((b, i) => (<span key={i} className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-800 ring-1 ring-amber-200">{b}<button onClick={() => removeBreakFromForm(i)} className="text-amber-600 hover:text-amber-900">✕</button></span>))}</div>}</div>
