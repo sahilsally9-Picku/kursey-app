@@ -40,7 +40,7 @@ function DepositForm({ amount, onPaid, onCancel }) {
     if (submitErr) { setErr(submitErr.message); setPaying(false); return; }
     const { error, paymentIntent } = await stripe.confirmPayment({ elements, redirect: "if_required" });
     if (error) { setErr(error.message); setPaying(false); return; }
-    if (paymentIntent && paymentIntent.status === "succeeded") { onPaid(); }
+    if (paymentIntent && paymentIntent.status === "succeeded") { onPaid(paymentIntent.id); }
     else { setErr("Payment didn't complete. Try again."); setPaying(false); }
   }
 
@@ -131,7 +131,7 @@ export default function ShopBooking() {
   const availableSlots = (barber && service && date) ? tightSlots(barber, service, dayBookings) : [];
   const input = "w-full rounded-xl bg-white px-4 py-3 text-sm text-stone-900 outline-none ring-1 ring-stone-300 placeholder:text-stone-400 focus:ring-emerald-500";
 
-  async function saveBooking(depositPaid) {
+  async function saveBooking(depositPaid, paymentIntentId) {
     setSaving(true);
     const dur = service.mins || 30;
     const { data: fresh } = await supabase.rpc("busy_times", { p_shop_id: shop.id, p_barber: barber.name, p_date: date.key });
@@ -145,6 +145,7 @@ export default function ShopBooking() {
       customer_user_id: customer ? customer.user.id : null,
       deposit_paid: depositPaid ? true : false,
       deposit_amount: depositPaid ? (shop.deposit_amount || 0) : 0,
+      stripe_payment_intent: paymentIntentId || null,
       status: "confirmed",
     });
     setSaving(false);
@@ -171,7 +172,7 @@ export default function ShopBooking() {
       } catch (err) { alert("Error: " + err.message); }
       setPreparingPayment(false);
     } else {
-      const ok = await saveBooking(false);
+      const ok = await saveBooking(false, null);
       if (ok) setStep("done");
     }
   }
@@ -179,7 +180,6 @@ export default function ShopBooking() {
   if (loading) return <div className="flex min-h-screen items-center justify-center bg-stone-100 text-stone-500">Loading…</div>;
   if (notFound) return <div className="flex min-h-screen items-center justify-center bg-stone-100 px-4 text-center"><div><h1 className="text-2xl font-bold text-stone-800">Shop not found</h1><p className="mt-1 text-stone-500">No shop at kursey.com/{slug}.</p></div></div>;
 
-  // pause booking if the shop isn't in good standing
   if (shop) {
     const status = shop.subscription_status || "trialing";
     const trialEnds = shop.trial_ends_at ? new Date(shop.trial_ends_at) : null;
@@ -262,7 +262,7 @@ export default function ShopBooking() {
               <Elements stripe={stripeForAccount} options={{ clientSecret }}>
                 <DepositForm
                   amount={shop.deposit_amount}
-                  onPaid={async () => { const ok = await saveBooking(true); if (ok) setStep("done"); }}
+                  onPaid={async (paymentIntentId) => { const ok = await saveBooking(true, paymentIntentId); if (ok) setStep("done"); }}
                   onCancel={() => { setStep("details"); setClientSecret(null); setStripeForAccount(null); }}
                 />
               </Elements>
