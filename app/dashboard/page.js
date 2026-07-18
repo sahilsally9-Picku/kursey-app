@@ -23,6 +23,22 @@ export default function Dashboard() {
       if (!shopData) { router.push("/signup"); return; }
       setShop(shopData); setChecking(false);
 
+      // if returning from checkout, confirm + activate
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("sub") === "success" && shopData.subscription_status !== "active") {
+        try {
+          const res = await fetch("/api/confirm-subscription", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ shopId: shopData.id }),
+          });
+          const conf = await res.json();
+          if (conf.active) {
+            shopData.subscription_status = "active";
+            setShop({ ...shopData });
+          }
+        } catch (e) {}
+      }
+
       const [bk, stf] = await Promise.all([
         supabase.from("bookings").select("*").eq("shop_id", shopData.id).order("created_at", { ascending: false }),
         supabase.from("staff").select("start_time,end_time").eq("shop_id", shopData.id),
