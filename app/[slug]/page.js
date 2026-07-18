@@ -119,6 +119,12 @@ export default function ShopBooking() {
   }
   async function logoutCustomer() { await supabase.auth.signOut(); setCustomer(null); setShowHistory(false); setName(""); setPhone(""); setEmail(""); }
   async function openHistory() { if (!customer) return; const { data } = await supabase.from("bookings").select("*").eq("customer_user_id", customer.user.id).order("created_at", { ascending: false }); setHistory(data || []); setShowHistory(true); }
+  async function cancelBooking(id) {
+    if (!confirm("Cancel this booking? This can't be undone.")) return;
+    const { error } = await supabase.from("bookings").update({ status: "cancelled" }).eq("id", id).eq("customer_user_id", customer.user.id);
+    if (error) { alert("Couldn't cancel: " + error.message); return; }
+    setHistory((prev) => prev.map((b) => b.id === id ? { ...b, status: "cancelled" } : b));
+  }
 
   const reset = () => { setStep("service"); setService(null); setBarber(null); setDate(null); setSlot(null); setDayBookings([]); if (!customer) { setName(""); setPhone(""); setEmail(""); } setOffers(false); setClientSecret(null); setStripeForAccount(null); };
   const dates = barber ? upcomingDates(barber) : [];
@@ -139,6 +145,7 @@ export default function ShopBooking() {
       customer_user_id: customer ? customer.user.id : null,
       deposit_paid: depositPaid ? true : false,
       deposit_amount: depositPaid ? (shop.deposit_amount || 0) : 0,
+      status: "confirmed",
     });
     setSaving(false);
     if (error) { alert("Something went wrong: " + error.message); return false; }
@@ -172,7 +179,7 @@ export default function ShopBooking() {
   if (loading) return <div className="flex min-h-screen items-center justify-center bg-stone-100 text-stone-500">Loading…</div>;
   if (notFound) return <div className="flex min-h-screen items-center justify-center bg-stone-100 px-4 text-center"><div><h1 className="text-2xl font-bold text-stone-800">Shop not found</h1><p className="mt-1 text-stone-500">No shop at kursey.com/{slug}.</p></div></div>;
 
-  // pause booking if the shop isn't in good standing (trial expired / payment failed)
+  // pause booking if the shop isn't in good standing
   if (shop) {
     const status = shop.subscription_status || "trialing";
     const trialEnds = shop.trial_ends_at ? new Date(shop.trial_ends_at) : null;
@@ -214,7 +221,29 @@ export default function ShopBooking() {
 
         {showAuth && !customer && (<div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-emerald-300"><div className="mb-3 flex gap-2"><button onClick={() => setAuthMode("login")} className={`flex-1 rounded-lg py-2 text-sm font-medium ${authMode === "login" ? "bg-emerald-600 text-white" : "bg-stone-100 text-stone-600"}`}>Log in</button><button onClick={() => setAuthMode("signup")} className={`flex-1 rounded-lg py-2 text-sm font-medium ${authMode === "signup" ? "bg-emerald-600 text-white" : "bg-stone-100 text-stone-600"}`}>Sign up</button></div><div className="space-y-2">{authMode === "signup" && <><input value={authName} onChange={(e) => setAuthName(e.target.value)} placeholder="Your name" className={input} /><input value={authPhone} onChange={(e) => setAuthPhone(e.target.value)} placeholder="Mobile number" className={input} /></>}<input value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="Email" type="email" className={input} /><input value={authPass} onChange={(e) => setAuthPass(e.target.value)} placeholder="Password (min 6)" type="password" className={input} /></div>{authErr && <p className="mt-2 text-sm text-red-600">{authErr}</p>}<div className="mt-3 flex gap-2"><button disabled={authBusy || !authEmail || !authPass} onClick={handleAuth} className="flex-1 rounded-xl bg-emerald-600 py-2.5 font-semibold text-white disabled:opacity-40">{authBusy ? "…" : authMode === "signup" ? "Create account" : "Log in"}</button><button onClick={() => setShowAuth(false)} className="rounded-xl bg-stone-200 px-4 py-2.5 text-sm font-medium text-stone-700">Cancel</button></div></div>)}
 
-        {showHistory && customer && (<div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-stone-200"><div className="flex items-center justify-between"><h2 className="font-semibold">Your past bookings</h2><button onClick={() => setShowHistory(false)} className="text-sm text-stone-500">Close</button></div>{history.length === 0 ? <p className="mt-2 text-sm text-stone-500">No bookings yet.</p> : <div className="mt-2 space-y-2">{history.map((b) => (<div key={b.id} className="rounded-xl bg-stone-50 p-3 text-sm ring-1 ring-stone-200"><div className="font-medium">{b.service} with {b.barber}</div><div className="text-stone-500">{b.day} at {b.slot} · ${b.price}</div></div>))}</div>}</div>)}
+        {showHistory && customer && (
+          <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-stone-200">
+            <div className="flex items-center justify-between"><h2 className="font-semibold">Your bookings</h2><button onClick={() => setShowHistory(false)} className="text-sm text-stone-500">Close</button></div>
+            {history.length === 0 ? <p className="mt-2 text-sm text-stone-500">No bookings yet.</p> : <div className="mt-2 space-y-2">{history.map((b) => {
+              const isCancelled = b.status === "cancelled";
+              const isUpcoming = b.booking_date && b.booking_date >= new Date().toISOString().slice(0, 10);
+              return (
+                <div key={b.id} className={`rounded-xl p-3 text-sm ring-1 ${isCancelled ? "bg-stone-100 ring-stone-200 opacity-60" : "bg-stone-50 ring-stone-200"}`}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="font-medium">{b.service} with {b.barber}</div>
+                      <div className="text-stone-500">{b.day} at {b.slot} · ${b.price}</div>
+                      {isCancelled && <div className="mt-1 text-xs font-medium text-red-600">Cancelled</div>}
+                    </div>
+                    {!isCancelled && isUpcoming && (
+                      <button onClick={() => cancelBooking(b.id)} className="shrink-0 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 ring-1 ring-red-200 hover:bg-red-100">Cancel</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}</div>}
+          </div>
+        )}
 
         {step === "service" && (<><h2 className="mt-6 mb-3 text-lg font-semibold">Choose a service</h2>{services.length === 0 ? <p className="rounded-xl bg-white p-4 text-stone-500 ring-1 ring-stone-200">This shop hasn't added services yet.</p> : <div className="space-y-2">{services.map((s) => (<button key={s.id} onClick={() => { setService(s); setStep("barber"); }} className="flex w-full items-start justify-between rounded-xl bg-white p-4 text-left ring-1 ring-stone-200 transition hover:ring-emerald-400"><div className="pr-3"><div className="font-medium">{s.name}</div><div className="text-sm text-stone-500">{s.mins} min</div>{s.description && <div className="mt-1 text-sm text-stone-400">{s.description}</div>}</div><div className="shrink-0 text-lg font-semibold">${s.price}</div></button>))}</div>}</>)}
 

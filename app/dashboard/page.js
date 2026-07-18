@@ -13,6 +13,15 @@ export default function Dashboard() {
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState(false);
+  const [showCampaign, setShowCampaign] = useState(false);
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState("");
+  // rebooking state
+  const [rebookWeeks, setRebookWeeks] = useState(4);
+  const [savingRebook, setSavingRebook] = useState(false);
+  const [rebookSaved, setRebookSaved] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -22,8 +31,8 @@ export default function Dashboard() {
       const { data: shopData } = await supabase.from("shops").select("*").eq("owner_id", session.user.id).limit(1).single();
       if (!shopData) { router.push("/signup"); return; }
       setShop(shopData); setChecking(false);
+      setRebookWeeks(shopData.rebooking_weeks || 4);
 
-      // if returning from checkout, confirm + activate
       const params = new URLSearchParams(window.location.search);
       if (params.get("sub") === "success" && shopData.subscription_status !== "active") {
         try {
@@ -32,10 +41,7 @@ export default function Dashboard() {
             body: JSON.stringify({ shopId: shopData.id }),
           });
           const conf = await res.json();
-          if (conf.active) {
-            shopData.subscription_status = "active";
-            setShop({ ...shopData });
-          }
+          if (conf.active) { shopData.subscription_status = "active"; setShop({ ...shopData }); }
         } catch (e) {}
       }
 
@@ -65,6 +71,35 @@ export default function Dashboard() {
     } catch (err) { alert("Error: " + err.message); setSubscribing(false); }
   }
 
+  async function sendCampaign() {
+    if (!subject || !message) { alert("Add a subject and message."); return; }
+    setSending(true); setSendResult("");
+    try {
+      const res = await fetch("/api/send-campaign", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shopId: shop.id, subject, message, origin: window.location.origin }),
+      });
+      const data = await res.json();
+      if (data.ok) { setSendResult(`Sent to ${data.sent} customer${data.sent === 1 ? "" : "s"}.`); setSubject(""); setMessage(""); }
+      else { setSendResult("Error: " + (data.error || "unknown")); }
+    } catch (err) { setSendResult("Error: " + err.message); }
+    setSending(false);
+  }
+
+  async function toggleRebooking() {
+    const newVal = !shop.rebooking_enabled;
+    await supabase.from("shops").update({ rebooking_enabled: newVal }).eq("id", shop.id);
+    setShop({ ...shop, rebooking_enabled: newVal });
+  }
+
+  async function saveRebookWeeks() {
+    setSavingRebook(true); setRebookSaved(false);
+    const w = parseInt(rebookWeeks) || 4;
+    await supabase.from("shops").update({ rebooking_weeks: w }).eq("id", shop.id);
+    setShop({ ...shop, rebooking_weeks: w });
+    setSavingRebook(false); setRebookSaved(true); setTimeout(() => setRebookSaved(false), 2000);
+  }
+
   if (checking) return <div className="flex min-h-screen items-center justify-center bg-stone-100 text-stone-500">Loading…</div>;
 
   const totalBookings = bookings.length;
@@ -72,7 +107,7 @@ export default function Dashboard() {
   const depositsCollected = bookings.reduce((sum, b) => sum + (b.deposit_paid ? (b.deposit_amount || 0) : 0), 0);
   const depositsCount = bookings.filter((b) => b.deposit_paid).length;
   const today = new Date().toISOString().slice(0, 10);
-  const upcoming = bookings.filter((b) => b.booking_date && b.booking_date >= today).length;
+  const upcoming = bookings.filter((b) => b.booking_date && b.booking_date >= today && b.status !== "cancelled").length;
   const starts = staff.map((s) => toMin(s.start_time)).filter((v) => v != null);
   const ends = staff.map((s) => toMin(s.end_time)).filter((v) => v != null);
   const openMin = starts.length ? Math.min(...starts) : 9 * 60;
@@ -138,6 +173,51 @@ export default function Dashboard() {
           <div className="rounded-2xl bg-stone-900 p-4 text-white"><div className="text-3xl font-bold text-emerald-400">${revenue}</div><div className="text-sm text-stone-300">Booked revenue</div></div>
         </div>
 
+        {/* MARKETING / SEND AN OFFER */}
+        <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-stone-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-semibold">Send an offer</div>
+              <div className="text-sm text-stone-500">Email your {offersList} opted-in customer{offersList === 1 ? "" : "s"}.</div>
+            </div>
+            <button onClick={() => setShowCampaign(!showCampaign)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700">{showCampaign ? "Close" : "Compose"}</button>
+          </div>
+          {showCampaign && (
+            <div className="mt-3 space-y-2">
+              <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject (e.g. 20% off this week!)" className="w-full rounded-xl bg-white px-4 py-3 text-sm text-stone-900 outline-none ring-1 ring-stone-300 placeholder:text-stone-400 focus:ring-emerald-500" />
+              <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Your message…" rows={5} className="w-full rounded-xl bg-white px-4 py-3 text-sm text-stone-900 outline-none ring-1 ring-stone-300 placeholder:text-stone-400 focus:ring-emerald-500 resize-none" />
+              <div className="flex items-center gap-3">
+                <button onClick={sendCampaign} disabled={sending || !subject || !message} className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{sending ? "Sending…" : `Send to ${offersList}`}</button>
+                {sendResult && <span className="text-sm font-medium text-emerald-700">{sendResult}</span>}
+              </div>
+              <p className="text-xs text-stone-400">An unsubscribe link is added automatically. Only customers who opted in receive this.</p>
+            </div>
+          )}
+        </div>
+
+        {/* REBOOKING NUDGE */}
+        <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-stone-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-semibold">Automatic rebooking reminders</div>
+              <div className="text-sm text-stone-500">Nudge clients who haven't visited in a while.</div>
+            </div>
+            <button onClick={toggleRebooking} className={`relative h-6 w-11 rounded-full transition ${shop.rebooking_enabled ? "bg-emerald-600" : "bg-stone-300"}`}>
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${shop.rebooking_enabled ? "left-[22px]" : "left-0.5"}`} />
+            </button>
+          </div>
+          {shop.rebooking_enabled && (
+            <div className="mt-3 flex items-end gap-2">
+              <div>
+                <div className="mb-1 text-xs font-medium text-stone-500">Send after (weeks since last visit)</div>
+                <input value={rebookWeeks} onChange={(e) => setRebookWeeks(e.target.value)} type="number" min="1" className="w-32 rounded-xl bg-white px-4 py-3 text-sm text-stone-900 outline-none ring-1 ring-stone-300 focus:ring-emerald-500" />
+              </div>
+              <button onClick={saveRebookWeeks} disabled={savingRebook} className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">{savingRebook ? "Saving…" : "Save"}</button>
+              {rebookSaved && <span className="pb-3 text-sm font-medium text-emerald-600">Saved ✓</span>}
+            </div>
+          )}
+        </div>
+
         {/* VALUE SECTION */}
         <h2 className="mt-6 mb-2 text-lg font-semibold">What Kursey is doing for you</h2>
         <div className="grid grid-cols-2 gap-3">
@@ -156,7 +236,7 @@ export default function Dashboard() {
         : (
           <div className="space-y-2">
             {bookings.map((b) => (
-              <div key={b.id} className="rounded-xl bg-white p-4 ring-1 ring-stone-200">
+              <div key={b.id} className={`rounded-xl p-4 ring-1 ${b.status === "cancelled" ? "bg-stone-100 ring-stone-200 opacity-60" : "bg-white ring-stone-200"}`}>
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="font-semibold">{b.customer_name}</div>
@@ -166,6 +246,7 @@ export default function Dashboard() {
                   <div className="text-right"><div className="font-semibold">${b.price}</div><div className="text-xs text-stone-400">{b.phone}</div></div>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
+                  {b.status === "cancelled" && <span className="inline-block rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600">Cancelled</span>}
                   {b.deposit_paid && <span className="inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">Deposit paid ${b.deposit_amount} ✓</span>}
                   {b.wants_offers && <span className="inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">on offers list</span>}
                 </div>
