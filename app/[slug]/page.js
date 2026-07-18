@@ -125,7 +125,8 @@ export default function ShopBooking() {
   const availableSlots = (barber && service && date) ? tightSlots(barber, service, dayBookings) : [];
   const input = "w-full rounded-xl bg-white px-4 py-3 text-sm text-stone-900 outline-none ring-1 ring-stone-300 placeholder:text-stone-400 focus:ring-emerald-500";
 
-  async function saveBooking() {
+  // now takes a "depositPaid" flag so we can record it on the booking
+  async function saveBooking(depositPaid) {
     setSaving(true);
     const dur = service.mins || 30;
     const { data: fresh } = await supabase.rpc("busy_times", { p_shop_id: shop.id, p_barber: barber.name, p_date: date.key });
@@ -137,6 +138,8 @@ export default function ShopBooking() {
       booking_date: date.key, start_min: slot, duration_min: dur,
       customer_name: name, phone: phone, email: email, wants_offers: offers,
       customer_user_id: customer ? customer.user.id : null,
+      deposit_paid: depositPaid ? true : false,
+      deposit_amount: depositPaid ? (shop.deposit_amount || 0) : 0,
     });
     setSaving(false);
     if (error) { alert("Something went wrong: " + error.message); return false; }
@@ -153,7 +156,6 @@ export default function ShopBooking() {
         });
         const data = await res.json();
         if (data.clientSecret) {
-          // load Stripe FOR the salon's connected account (this was the fix)
           const sp = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, { stripeAccount: data.accountId });
           setStripeForAccount(sp);
           setClientSecret(data.clientSecret);
@@ -163,7 +165,7 @@ export default function ShopBooking() {
       } catch (err) { alert("Error: " + err.message); }
       setPreparingPayment(false);
     } else {
-      const ok = await saveBooking();
+      const ok = await saveBooking(false);
       if (ok) setStep("done");
     }
   }
@@ -211,7 +213,7 @@ export default function ShopBooking() {
               <Elements stripe={stripeForAccount} options={{ clientSecret }}>
                 <DepositForm
                   amount={shop.deposit_amount}
-                  onPaid={async () => { const ok = await saveBooking(); if (ok) setStep("done"); }}
+                  onPaid={async () => { const ok = await saveBooking(true); if (ok) setStep("done"); }}
                   onCancel={() => { setStep("details"); setClientSecret(null); setStripeForAccount(null); }}
                 />
               </Elements>
