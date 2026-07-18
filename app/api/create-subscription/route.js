@@ -7,23 +7,31 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
+const PLAN_PRICES = {
+  solo: "price_1TudCZ1F2GYIHOz9CC4Nljqc",
+  shop: "price_1TudEN1F2GYIHOz9hnExp1RH",
+  studio: "price_1TudFo1F2GYIHOz9eo8lpDla",
+};
+
 export async function POST(request) {
   try {
-    const { shopId, origin } = await request.json();
+    const { shopId, origin, plan } = await request.json();
     if (!shopId) return Response.json({ error: "Missing shopId" }, { status: 400 });
+
+    const chosenPlan = PLAN_PRICES[plan] ? plan : "shop";
+    const priceId = PLAN_PRICES[chosenPlan];
 
     const { data: shop } = await supabase.from("shops").select("*").eq("id", shopId).single();
     if (!shop) return Response.json({ error: "Shop not found" }, { status: 404 });
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
-      line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
+      line_items: [{ price: priceId, quantity: 1 }],
       client_reference_id: shopId,
-      metadata: { shop_id: shopId },
-      // tag the subscription + customer so later invoices know the shop
-      subscription_data: { metadata: { shop_id: shopId } },
+      metadata: { shop_id: shopId, plan: chosenPlan },
+      subscription_data: { metadata: { shop_id: shopId, plan: chosenPlan } },
       success_url: `${origin}/dashboard?sub=success`,
-      cancel_url: `${origin}/dashboard?sub=cancelled`,
+      cancel_url: `${origin}/plan?sub=cancelled`,
     });
 
     return Response.json({ url: session.url });

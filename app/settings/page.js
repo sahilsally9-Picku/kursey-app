@@ -12,6 +12,9 @@ const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const TIMES = [];
 for (let h = 0; h < 24; h++) for (let m of [0, 30]) TIMES.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
 
+const PLAN_LIMITS = { solo: 1, shop: 5, studio: Infinity };
+const PLAN_LABELS = { solo: "Solo", shop: "Shop", studio: "Studio" };
+
 function SettingsInner() {
   const [checking, setChecking] = useState(true);
   const [shop, setShop] = useState(null);
@@ -146,6 +149,12 @@ function SettingsInner() {
   function removeBreakFromForm(i) { setStBreaks((prev) => prev.filter((_, idx) => idx !== i)); }
   async function saveStaff() {
     if (!stName || stDays.length === 0) { alert("Add a name and at least one working day."); return; }
+    const plan = shop.plan || "shop";
+    const limit = PLAN_LIMITS[plan] ?? 5;
+    if (!editStaffId && staff.length >= limit) {
+      alert(`You're on the ${PLAN_LABELS[plan]} plan (${limit === Infinity ? "unlimited" : limit} barber${limit === 1 ? "" : "s"}). Upgrade your plan to add more barbers.`);
+      return;
+    }
     const starts = stDays.map((d) => (stDayHours[d] || ["09:00", "17:00"])[0]).sort();
     const ends = stDays.map((d) => (stDayHours[d] || ["09:00", "17:00"])[1]).sort();
     const minStart = starts[0] || "09:00";
@@ -181,6 +190,9 @@ function SettingsInner() {
   const btnGold = "rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 font-semibold text-white shadow-lg transition enabled:hover:from-amber-700 enabled:hover:to-amber-600 disabled:opacity-40";
   const connected = !!shop.stripe_account_id;
   const justReturned = searchParams.get("stripe") === "done";
+  const plan = shop.plan || "shop";
+  const planLimit = PLAN_LIMITS[plan];
+  const atLimit = staff.length >= planLimit;
 
   return (
     <div className="min-h-screen text-white">
@@ -190,8 +202,18 @@ function SettingsInner() {
           <a href="/dashboard" className="text-sm font-medium text-amber-400 hover:underline">← Dashboard</a>
         </div>
 
+        {/* PLAN */}
+        <h2 className="mt-6 mb-2 font-display text-xl font-semibold">Your plan</h2>
+        <div className={`flex items-center justify-between p-4 ${card}`}>
+          <div>
+            <div className="font-medium">{PLAN_LABELS[plan]} plan</div>
+            <div className="text-xs text-stone-400">{planLimit === Infinity ? "Unlimited barbers" : `Up to ${planLimit} barber${planLimit === 1 ? "" : "s"}`} · {staff.length} in use</div>
+          </div>
+          <a href="/plan" className={`px-4 py-2 text-sm ${btnGold}`}>Change plan</a>
+        </div>
+
         {/* PAYMENTS / DEPOSITS */}
-        <h2 className="mt-6 mb-2 font-display text-xl font-semibold">Payments &amp; deposits</h2>
+        <h2 className="mt-8 mb-2 font-display text-xl font-semibold">Payments &amp; deposits</h2>
         <div className={`p-4 ${card}`}>
           {justReturned && <p className="mb-2 rounded-lg bg-amber-500/15 px-3 py-2 text-sm text-amber-200 ring-1 ring-amber-400/30">Returned from Stripe. If setup is complete, you're ready to take deposits.</p>}
           {!connected ? (
@@ -236,7 +258,8 @@ function SettingsInner() {
         {services.length > 0 && <div className="mt-2 space-y-2">{services.map((s) => (<div key={s.id} className={`flex items-start justify-between p-4 ${card}`}><div className="pr-3"><div className="font-medium">{s.name}</div><div className="text-sm text-stone-300">{s.mins} min · ${s.price}</div>{s.description && <div className="mt-0.5 font-display text-xs italic text-stone-400">{s.description}</div>}</div><div className="flex shrink-0 items-center gap-3"><button onClick={() => startEditService(s)} className="text-sm text-amber-400 hover:underline">Edit</button><button onClick={() => deleteService(s.id)} className="text-sm text-red-300 hover:underline">Remove</button></div></div>))}</div>}
 
         {/* STAFF */}
-        <h2 className="mt-8 mb-2 font-display text-xl font-semibold">Barbers / staff ({staff.length})</h2>
+        <h2 className="mt-8 mb-2 font-display text-xl font-semibold">Barbers / staff ({staff.length}{planLimit !== Infinity ? ` / ${planLimit}` : ""})</h2>
+        {atLimit && <div className="mb-2 rounded-xl bg-amber-500/15 px-3 py-2 text-sm text-amber-200 ring-1 ring-amber-400/30">You've reached your {PLAN_LABELS[plan]} plan limit. <a href="/plan" className="font-semibold underline">Upgrade</a> to add more barbers.</div>}
         <div className={`p-4 ${editStaffId ? "rounded-2xl bg-stone-900/75 ring-1 ring-amber-400/50 backdrop-blur-md" : card}`}>
           {editStaffId && <p className="mb-2 text-sm font-medium text-amber-400">Editing barber…</p>}
           <div className="space-y-2">

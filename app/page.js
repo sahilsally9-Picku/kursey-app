@@ -129,40 +129,35 @@ export default function Landing() {
       </section>
 
       {/* PRICING */}
-      <section id="pricing" className="mx-auto max-w-3xl px-4 py-14">
+      <section id="pricing" className="mx-auto max-w-5xl px-4 py-14">
         <div className="mb-8 text-center">
-          <h2 className="font-display text-3xl font-bold tracking-tight">One simple price</h2>
-          <p className="mx-auto mt-2 max-w-md text-stone-500">No tiers to decode. No per-booking fees. Everything included.</p>
+          <h2 className="font-display text-3xl font-bold tracking-tight">Flat pricing that grows with you</h2>
+          <p className="mx-auto mt-2 max-w-lg text-stone-500">Pick a plan by your team size. Add barbers up to your plan — the price never creeps per person, and there's never a commission.</p>
         </div>
-        <div className="overflow-hidden rounded-3xl bg-white shadow-[0_20px_60px_-25px_rgba(120,80,20,0.35)] ring-1 ring-stone-200/70">
-          <div className="bg-gradient-to-br from-stone-900 via-stone-800 to-amber-800 px-8 py-8 text-center text-white">
-            <div className="text-sm font-medium uppercase tracking-wide text-amber-300/90">Kursey</div>
-            <div className="mt-2 flex items-end justify-center gap-1">
-              <span className="font-display text-5xl font-bold">$34.99</span>
-              <span className="mb-1.5 text-stone-300">/ month</span>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {[
+            { name: "Solo", price: "$12.99", blurb: "For a single-chair barber.", features: ["1 barber", "Your own booking page", "Deposits & reminders", "Reviews & rebooking"] },
+            { name: "Shop", price: "$29.99", blurb: "For a typical barbershop.", features: ["Up to 5 barbers", "Everything in Solo", "Per-barber logins", "Priority support"], popular: true },
+            { name: "Studio", price: "$49.99", blurb: "For large shops & chains.", features: ["Unlimited barbers", "Everything in Shop", "Best for growing teams"] },
+          ].map((p) => (
+            <div key={p.name} className={`relative flex flex-col rounded-3xl bg-white p-6 shadow-[0_20px_60px_-30px_rgba(120,80,20,0.35)] ring-1 ${p.popular ? "ring-2 ring-amber-400" : "ring-stone-200/70"}`}>
+              {p.popular && <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 px-3 py-0.5 text-xs font-bold text-white shadow">Most popular</div>}
+              <div className="font-display text-xl font-semibold text-stone-900">{p.name}</div>
+              <div className="mt-1 flex items-end gap-1"><span className="font-display text-4xl font-bold text-amber-700">{p.price}</span><span className="mb-1 text-sm text-stone-400">/mo</span></div>
+              <p className="mt-2 text-sm text-stone-500">{p.blurb}</p>
+              <ul className="mt-4 flex-1 space-y-2 text-sm text-stone-700">
+                {p.features.map((f) => (
+                  <li key={f} className="flex items-start gap-2">
+                    <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-amber-100 text-xs font-bold text-amber-700">✓</span>
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link href="/signup" className={`mt-6 block w-full py-3 text-center ${btnGold}`}>Start free</Link>
             </div>
-            <div className="mt-1 text-sm text-stone-300">Start with a 14-day free trial</div>
-          </div>
-          <div className="px-8 py-7">
-            <ul className="space-y-2.5 text-sm text-stone-700">
-              {[
-                "Your own branded booking page",
-                "Unlimited bookings and staff",
-                "Deposits with 0% commission",
-                "Email confirmations & reminders",
-                "Reviews and automatic rebooking",
-                "Per-barber logins & schedules",
-              ].map((item) => (
-                <li key={item} className="flex items-start gap-2.5">
-                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-amber-100 text-xs font-bold text-amber-700">✓</span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-            <Link href="/signup" className={`mt-6 block w-full py-3.5 text-center ${btnGold}`}>Start free — create your shop</Link>
-            <p className="mt-3 text-center text-xs text-stone-400">No card required to start. Cancel anytime.</p>
-          </div>
+          ))}
         </div>
+        <p className="mt-6 text-center text-sm text-stone-500">Every plan includes a <span className="font-semibold text-stone-700">14-day free trial</span>, all features, and <span className="font-semibold text-stone-700">0% commission</span>. Cancel anytime.</p>
       </section>
 
       {/* FAQ */}
