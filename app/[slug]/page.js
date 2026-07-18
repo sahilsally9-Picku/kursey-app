@@ -68,6 +68,7 @@ export default function ShopBooking() {
   const [customer, setCustomer] = useState(null); const [showAuth, setShowAuth] = useState(false); const [authMode, setAuthMode] = useState("login");
   const [authEmail, setAuthEmail] = useState(""); const [authPass, setAuthPass] = useState(""); const [authName, setAuthName] = useState(""); const [authPhone, setAuthPhone] = useState("");
   const [authErr, setAuthErr] = useState(""); const [authBusy, setAuthBusy] = useState(false);
+  const [resetSent, setResetSent] = useState(false); const [resetting, setResetting] = useState(false);
   const [showHistory, setShowHistory] = useState(false); const [history, setHistory] = useState([]);
   const [reviewFor, setReviewFor] = useState(null); const [rStars, setRStars] = useState(5); const [rComment, setRComment] = useState(""); const [savingReview, setSavingReview] = useState(false);
   const [step, setStep] = useState("service");
@@ -126,6 +127,14 @@ export default function ShopBooking() {
     } catch (err) { setAuthErr(err.message || "Something went wrong."); }
     setAuthBusy(false);
   }
+  async function sendCustomerReset() {
+    if (!authEmail) { setAuthErr("Enter your email first."); return; }
+    setResetting(true); setAuthErr("");
+    const { error } = await supabase.auth.resetPasswordForEmail(authEmail, { redirectTo: `${window.location.origin}/reset-password` });
+    setResetting(false);
+    if (error) { setAuthErr(error.message); return; }
+    setResetSent(true);
+  }
   async function logoutCustomer() { await supabase.auth.signOut(); setCustomer(null); setShowHistory(false); setName(""); setPhone(""); setEmail(""); }
   async function openHistory() { if (!customer) return; const { data } = await supabase.from("bookings").select("*").eq("customer_user_id", customer.user.id).order("created_at", { ascending: false }); setHistory(data || []); setShowHistory(true); }
   async function cancelBooking(id) {
@@ -136,15 +145,10 @@ export default function ShopBooking() {
   }
   async function submitReview(booking) {
     setSavingReview(true);
-    const { error } = await supabase.from("reviews").insert({
-      shop_id: shop.id, barber: booking.barber, booking_id: booking.id,
-      customer_user_id: customer.user.id, customer_name: customer.profile?.name || "Customer",
-      rating: rStars, comment: rComment,
-    });
+    const { error } = await supabase.from("reviews").insert({ shop_id: shop.id, barber: booking.barber, booking_id: booking.id, customer_user_id: customer.user.id, customer_name: customer.profile?.name || "Customer", rating: rStars, comment: rComment });
     if (error) { setSavingReview(false); alert("Couldn't save review: " + error.message); return; }
     await supabase.from("bookings").update({ reviewed: true }).eq("id", booking.id);
     setHistory((prev) => prev.map((b) => b.id === booking.id ? { ...b, reviewed: true } : b));
-    // refresh reviews so it shows on the profile
     const { data: rev } = await supabase.from("reviews").select("*").eq("shop_id", shop.id).order("created_at", { ascending: false });
     setReviews(rev || []);
     setReviewFor(null); setRStars(5); setRComment(""); setSavingReview(false);
@@ -223,7 +227,7 @@ export default function ShopBooking() {
       <div className="mx-auto max-w-lg px-4 py-8">
         <div className="mb-3 flex items-center justify-end gap-3 text-sm">
           {customer ? (<><button onClick={openHistory} className="font-medium text-emerald-700 hover:underline">My bookings</button><button onClick={logoutCustomer} className="text-stone-500 hover:underline">Log out</button></>)
-          : (<button onClick={() => { setShowAuth(true); setAuthMode("login"); }} className="font-medium text-emerald-700 hover:underline">Log in / Sign up</button>)}
+          : (<button onClick={() => { setShowAuth(true); setAuthMode("login"); setResetSent(false); setAuthErr(""); }} className="font-medium text-emerald-700 hover:underline">Log in / Sign up</button>)}
         </div>
 
         <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-stone-200">
@@ -238,7 +242,34 @@ export default function ShopBooking() {
           </div>
         </div>
 
-        {showAuth && !customer && (<div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-emerald-300"><div className="mb-3 flex gap-2"><button onClick={() => setAuthMode("login")} className={`flex-1 rounded-lg py-2 text-sm font-medium ${authMode === "login" ? "bg-emerald-600 text-white" : "bg-stone-100 text-stone-600"}`}>Log in</button><button onClick={() => setAuthMode("signup")} className={`flex-1 rounded-lg py-2 text-sm font-medium ${authMode === "signup" ? "bg-emerald-600 text-white" : "bg-stone-100 text-stone-600"}`}>Sign up</button></div><div className="space-y-2">{authMode === "signup" && <><input value={authName} onChange={(e) => setAuthName(e.target.value)} placeholder="Your name" className={input} /><input value={authPhone} onChange={(e) => setAuthPhone(e.target.value)} placeholder="Mobile number" className={input} /></>}<input value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="Email" type="email" className={input} /><input value={authPass} onChange={(e) => setAuthPass(e.target.value)} placeholder="Password (min 6)" type="password" className={input} /></div>{authErr && <p className="mt-2 text-sm text-red-600">{authErr}</p>}<div className="mt-3 flex gap-2"><button disabled={authBusy || !authEmail || !authPass} onClick={handleAuth} className="flex-1 rounded-xl bg-emerald-600 py-2.5 font-semibold text-white disabled:opacity-40">{authBusy ? "…" : authMode === "signup" ? "Create account" : "Log in"}</button><button onClick={() => setShowAuth(false)} className="rounded-xl bg-stone-200 px-4 py-2.5 text-sm font-medium text-stone-700">Cancel</button></div></div>)}
+        {showAuth && !customer && (
+          <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-emerald-300">
+            {authMode === "forgot" ? (
+              <>
+                <h3 className="mb-2 font-semibold">Reset password</h3>
+                {resetSent ? (
+                  <p className="text-sm text-emerald-700">Check your email for a reset link. (It may take a minute, and could land in spam.)</p>
+                ) : (
+                  <>
+                    <p className="mb-2 text-sm text-stone-500">Enter your email and we'll send a reset link.</p>
+                    <input value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="Email" type="email" className={input} />
+                    {authErr && <p className="mt-2 text-sm text-red-600">{authErr}</p>}
+                    <button disabled={resetting || !authEmail} onClick={sendCustomerReset} className="mt-3 w-full rounded-xl bg-emerald-600 py-2.5 font-semibold text-white disabled:opacity-40">{resetting ? "Sending…" : "Send reset link"}</button>
+                  </>
+                )}
+                <button onClick={() => { setAuthMode("login"); setResetSent(false); setAuthErr(""); }} className="mt-3 block w-full text-center text-sm text-stone-500 hover:underline">← Back to login</button>
+              </>
+            ) : (
+              <>
+                <div className="mb-3 flex gap-2"><button onClick={() => setAuthMode("login")} className={`flex-1 rounded-lg py-2 text-sm font-medium ${authMode === "login" ? "bg-emerald-600 text-white" : "bg-stone-100 text-stone-600"}`}>Log in</button><button onClick={() => setAuthMode("signup")} className={`flex-1 rounded-lg py-2 text-sm font-medium ${authMode === "signup" ? "bg-emerald-600 text-white" : "bg-stone-100 text-stone-600"}`}>Sign up</button></div>
+                <div className="space-y-2">{authMode === "signup" && <><input value={authName} onChange={(e) => setAuthName(e.target.value)} placeholder="Your name" className={input} /><input value={authPhone} onChange={(e) => setAuthPhone(e.target.value)} placeholder="Mobile number" className={input} /></>}<input value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="Email" type="email" className={input} /><input value={authPass} onChange={(e) => setAuthPass(e.target.value)} placeholder="Password (min 6)" type="password" className={input} /></div>
+                {authErr && <p className="mt-2 text-sm text-red-600">{authErr}</p>}
+                <div className="mt-3 flex gap-2"><button disabled={authBusy || !authEmail || !authPass} onClick={handleAuth} className="flex-1 rounded-xl bg-emerald-600 py-2.5 font-semibold text-white disabled:opacity-40">{authBusy ? "…" : authMode === "signup" ? "Create account" : "Log in"}</button><button onClick={() => setShowAuth(false)} className="rounded-xl bg-stone-200 px-4 py-2.5 text-sm font-medium text-stone-700">Cancel</button></div>
+                {authMode === "login" && <button onClick={() => { setAuthMode("forgot"); setResetSent(false); setAuthErr(""); }} className="mt-2 block w-full text-center text-sm text-emerald-700 hover:underline">Forgot password?</button>}
+              </>
+            )}
+          </div>
+        )}
 
         {showHistory && customer && (
           <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-stone-200">
