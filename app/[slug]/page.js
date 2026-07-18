@@ -125,7 +125,6 @@ export default function ShopBooking() {
   const availableSlots = (barber && service && date) ? tightSlots(barber, service, dayBookings) : [];
   const input = "w-full rounded-xl bg-white px-4 py-3 text-sm text-stone-900 outline-none ring-1 ring-stone-300 placeholder:text-stone-400 focus:ring-emerald-500";
 
-  // now takes a "depositPaid" flag so we can record it on the booking
   async function saveBooking(depositPaid) {
     setSaving(true);
     const dur = service.mins || 30;
@@ -173,6 +172,25 @@ export default function ShopBooking() {
   if (loading) return <div className="flex min-h-screen items-center justify-center bg-stone-100 text-stone-500">Loading…</div>;
   if (notFound) return <div className="flex min-h-screen items-center justify-center bg-stone-100 px-4 text-center"><div><h1 className="text-2xl font-bold text-stone-800">Shop not found</h1><p className="mt-1 text-stone-500">No shop at kursey.com/{slug}.</p></div></div>;
 
+  // pause booking if the shop isn't in good standing (trial expired / payment failed)
+  if (shop) {
+    const status = shop.subscription_status || "trialing";
+    const trialEnds = shop.trial_ends_at ? new Date(shop.trial_ends_at) : null;
+    const trialValid = status === "trialing" && trialEnds && trialEnds > new Date();
+    const inGoodStanding = status === "active" || trialValid;
+    if (!inGoodStanding) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-stone-100 px-4 text-center">
+          <div className="max-w-sm">
+            <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full bg-stone-200 text-2xl">⏸️</div>
+            <h1 className="text-2xl font-bold text-stone-800">Booking temporarily unavailable</h1>
+            <p className="mt-2 text-stone-500">{shop.name} isn't taking online bookings right now. Please contact them directly{shop.phone ? ` at ${shop.phone}` : ""}.</p>
+          </div>
+        </div>
+      );
+    }
+  }
+
   return (
     <div className="min-h-screen bg-stone-100 text-stone-900">
       {lightbox && (<div onClick={() => setLightbox(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><img src={lightbox} alt="" className="max-h-[90vh] max-w-full rounded-xl" /></div>)}
@@ -189,6 +207,8 @@ export default function ShopBooking() {
             <h1 className="text-2xl font-bold">{shop.name}</h1>
             {shop.description && <p className="mt-1 text-sm leading-relaxed text-stone-600">{shop.description}</p>}
             <div className="mt-2 flex flex-col gap-1 text-sm text-stone-500">{shop.address && <div className="flex items-center gap-1.5"><span>📍</span>{shop.address}</div>}{shop.phone && <div className="flex items-center gap-1.5"><span>📞</span>{shop.phone}</div>}</div>
+            {!customer && <p className="mt-2 text-xs text-stone-400">Book in seconds — no app, no account needed.</p>}
+            {customer && <p className="mt-2 text-xs text-emerald-600">Welcome back, {customer.profile?.name || "friend"}!</p>}
           </div>
         </div>
 
