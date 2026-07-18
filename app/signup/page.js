@@ -46,7 +46,7 @@ export default function Signup() {
       return;
     }
 
-    router.push("/dashboard");
+    router.replace("/plan");
   }
 
   const input = "w-full rounded-xl bg-white/95 px-4 py-3 text-sm text-stone-900 outline-none ring-1 ring-white/20 placeholder:text-stone-400 focus:ring-amber-500";
