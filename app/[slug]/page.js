@@ -25,6 +25,9 @@ function tightSlots(barber, service, bookings) {
   while (cur + dur <= close && g < 300) { g++; const hit = busy.find((b) => overlaps(cur, cur + dur, b.s, b.e)); if (hit) { cur = hit.e; continue; } out.push(cur); cur += dur; }
   return out;
 }
+function Stars({ value, size = "text-base" }) {
+  return <span className={size}>{[1,2,3,4,5].map((n) => <span key={n} className={n <= Math.round(value) ? "text-amber-500" : "text-stone-300"}>★</span>)}</span>;
+}
 
 function DepositForm({ amount, onPaid, onCancel }) {
   const stripe = useStripe();
@@ -61,10 +64,12 @@ export default function ShopBooking() {
   const slug = useParams().slug;
   const [shop, setShop] = useState(null); const [notFound, setNotFound] = useState(false);
   const [services, setServices] = useState([]); const [staff, setStaff] = useState([]); const [loading, setLoading] = useState(true);
+  const [reviews, setReviews] = useState([]);
   const [customer, setCustomer] = useState(null); const [showAuth, setShowAuth] = useState(false); const [authMode, setAuthMode] = useState("login");
   const [authEmail, setAuthEmail] = useState(""); const [authPass, setAuthPass] = useState(""); const [authName, setAuthName] = useState(""); const [authPhone, setAuthPhone] = useState("");
   const [authErr, setAuthErr] = useState(""); const [authBusy, setAuthBusy] = useState(false);
   const [showHistory, setShowHistory] = useState(false); const [history, setHistory] = useState([]);
+  const [reviewFor, setReviewFor] = useState(null); const [rStars, setRStars] = useState(5); const [rComment, setRComment] = useState(""); const [savingReview, setSavingReview] = useState(false);
   const [step, setStep] = useState("service");
   const [service, setService] = useState(null); const [barber, setBarber] = useState(null);
   const [date, setDate] = useState(null); const [slot, setSlot] = useState(null);
@@ -81,11 +86,12 @@ export default function ShopBooking() {
       const { data: shopData } = await supabase.from("shops").select("*").eq("slug", slug).limit(1).single();
       if (!shopData) { setNotFound(true); setLoading(false); return; }
       setShop(shopData);
-      const [srv, stf] = await Promise.all([
+      const [srv, stf, rev] = await Promise.all([
         supabase.from("services").select("*").eq("shop_id", shopData.id).order("created_at", { ascending: true }),
         supabase.from("staff").select("*").eq("shop_id", shopData.id).order("created_at", { ascending: true }),
+        supabase.from("reviews").select("*").eq("shop_id", shopData.id).order("created_at", { ascending: false }),
       ]);
-      if (srv.data) setServices(srv.data); if (stf.data) setStaff(stf.data);
+      if (srv.data) setServices(srv.data); if (stf.data) setStaff(stf.data); if (rev.data) setReviews(rev.data);
       const { data: { session } } = await supabase.auth.getSession();
       if (session) { const { data: prof } = await supabase.from("customer_profiles").select("*").eq("user_id", session.user.id).eq("shop_id", shopData.id).limit(1).single(); if (prof) { setCustomer({ user: session.user, profile: prof }); setName(prof.name || ""); setPhone(prof.phone || ""); setEmail(prof.email || ""); } }
       setLoading(false);
@@ -102,6 +108,9 @@ export default function ShopBooking() {
     }
     loadDay();
   }, [barber, date, shop]);
+
+  function reviewsFor(barberName) { return reviews.filter((r) => r.barber === barberName); }
+  function avgRating(barberName) { const rs = reviewsFor(barberName); if (rs.length === 0) return null; return rs.reduce((s, r) => s + (r.rating || 0), 0) / rs.length; }
 
   async function handleAuth() {
     setAuthErr(""); setAuthBusy(true);
@@ -124,6 +133,21 @@ export default function ShopBooking() {
     const { error } = await supabase.from("bookings").update({ status: "cancelled" }).eq("id", id).eq("customer_user_id", customer.user.id);
     if (error) { alert("Couldn't cancel: " + error.message); return; }
     setHistory((prev) => prev.map((b) => b.id === id ? { ...b, status: "cancelled" } : b));
+  }
+  async function submitReview(booking) {
+    setSavingReview(true);
+    const { error } = await supabase.from("reviews").insert({
+      shop_id: shop.id, barber: booking.barber, booking_id: booking.id,
+      customer_user_id: customer.user.id, customer_name: customer.profile?.name || "Customer",
+      rating: rStars, comment: rComment,
+    });
+    if (error) { setSavingReview(false); alert("Couldn't save review: " + error.message); return; }
+    await supabase.from("bookings").update({ reviewed: true }).eq("id", booking.id);
+    setHistory((prev) => prev.map((b) => b.id === booking.id ? { ...b, reviewed: true } : b));
+    // refresh reviews so it shows on the profile
+    const { data: rev } = await supabase.from("reviews").select("*").eq("shop_id", shop.id).order("created_at", { ascending: false });
+    setReviews(rev || []);
+    setReviewFor(null); setRStars(5); setRComment(""); setSavingReview(false);
   }
 
   const reset = () => { setStep("service"); setService(null); setBarber(null); setDate(null); setSlot(null); setDayBookings([]); if (!customer) { setName(""); setPhone(""); setEmail(""); } setOffers(false); setClientSecret(null); setStripeForAccount(null); };
@@ -157,16 +181,11 @@ export default function ShopBooking() {
     if (shop.deposits_enabled && shop.stripe_account_id) {
       setPreparingPayment(true);
       try {
-        const res = await fetch("/api/create-payment", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ shopId: shop.id }),
-        });
+        const res = await fetch("/api/create-payment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shopId: shop.id }) });
         const data = await res.json();
         if (data.clientSecret) {
           const sp = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, { stripeAccount: data.accountId });
-          setStripeForAccount(sp);
-          setClientSecret(data.clientSecret);
-          setStep("pay");
+          setStripeForAccount(sp); setClientSecret(data.clientSecret); setStep("pay");
         }
         else { alert("Couldn't start payment: " + (data.error || "unknown")); }
       } catch (err) { alert("Error: " + err.message); }
@@ -227,6 +246,7 @@ export default function ShopBooking() {
             {history.length === 0 ? <p className="mt-2 text-sm text-stone-500">No bookings yet.</p> : <div className="mt-2 space-y-2">{history.map((b) => {
               const isCancelled = b.status === "cancelled";
               const isUpcoming = b.booking_date && b.booking_date >= new Date().toISOString().slice(0, 10);
+              const isPast = b.booking_date && b.booking_date < new Date().toISOString().slice(0, 10);
               return (
                 <div key={b.id} className={`rounded-xl p-3 text-sm ring-1 ${isCancelled ? "bg-stone-100 ring-stone-200 opacity-60" : "bg-stone-50 ring-stone-200"}`}>
                   <div className="flex items-start justify-between">
@@ -235,10 +255,17 @@ export default function ShopBooking() {
                       <div className="text-stone-500">{b.day} at {b.slot} · ${b.price}</div>
                       {isCancelled && <div className="mt-1 text-xs font-medium text-red-600">Cancelled</div>}
                     </div>
-                    {!isCancelled && isUpcoming && (
-                      <button onClick={() => cancelBooking(b.id)} className="shrink-0 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 ring-1 ring-red-200 hover:bg-red-100">Cancel</button>
-                    )}
+                    {!isCancelled && isUpcoming && (<button onClick={() => cancelBooking(b.id)} className="shrink-0 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 ring-1 ring-red-200 hover:bg-red-100">Cancel</button>)}
                   </div>
+                  {!isCancelled && isPast && !b.reviewed && reviewFor !== b.id && (<button onClick={() => { setReviewFor(b.id); setRStars(5); setRComment(""); }} className="mt-2 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200 hover:bg-amber-100">Leave a review</button>)}
+                  {b.reviewed && <div className="mt-2 text-xs font-medium text-emerald-600">✓ Reviewed</div>}
+                  {reviewFor === b.id && (
+                    <div className="mt-2 rounded-lg bg-white p-3 ring-1 ring-amber-200">
+                      <div className="mb-2 flex gap-1">{[1,2,3,4,5].map((n) => (<button key={n} onClick={() => setRStars(n)} className={`text-2xl ${n <= rStars ? "text-amber-500" : "text-stone-300"}`}>★</button>))}</div>
+                      <textarea value={rComment} onChange={(e) => setRComment(e.target.value)} placeholder="How was your visit? (optional)" rows={3} className={`${input} resize-none`} />
+                      <div className="mt-2 flex gap-2"><button onClick={() => submitReview(b)} disabled={savingReview} className="flex-1 rounded-lg bg-emerald-600 py-2 text-sm font-semibold text-white disabled:opacity-40">{savingReview ? "Saving…" : "Submit review"}</button><button onClick={() => setReviewFor(null)} className="rounded-lg bg-stone-200 px-3 py-2 text-sm font-medium text-stone-700">Cancel</button></div>
+                    </div>
+                  )}
                 </div>
               );
             })}</div>}
@@ -247,7 +274,25 @@ export default function ShopBooking() {
 
         {step === "service" && (<><h2 className="mt-6 mb-3 text-lg font-semibold">Choose a service</h2>{services.length === 0 ? <p className="rounded-xl bg-white p-4 text-stone-500 ring-1 ring-stone-200">This shop hasn't added services yet.</p> : <div className="space-y-2">{services.map((s) => (<button key={s.id} onClick={() => { setService(s); setStep("barber"); }} className="flex w-full items-start justify-between rounded-xl bg-white p-4 text-left ring-1 ring-stone-200 transition hover:ring-emerald-400"><div className="pr-3"><div className="font-medium">{s.name}</div><div className="text-sm text-stone-500">{s.mins} min</div>{s.description && <div className="mt-1 text-sm text-stone-400">{s.description}</div>}</div><div className="shrink-0 text-lg font-semibold">${s.price}</div></button>))}</div>}</>)}
 
-        {step === "barber" && (<><button onClick={() => setStep("service")} className="mt-6 text-sm font-medium text-stone-500">← Back</button><h2 className="mt-2 mb-1 text-lg font-semibold">Pick your barber</h2>{staff.length === 0 ? <p className="mt-3 rounded-xl bg-white p-4 text-stone-500 ring-1 ring-stone-200">This shop hasn't added barbers yet.</p> : <div className="space-y-3">{staff.map((b) => (<div key={b.id} className="rounded-2xl bg-white p-4 ring-1 ring-stone-200"><div className="flex items-start gap-3"><div className={`grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl ${b.color || "bg-emerald-700"} text-xl font-semibold text-white`}>{b.photo_url ? <img src={b.photo_url} alt={b.name} className="h-full w-full object-cover" /> : b.name[0]}</div><div className="flex-1"><div className="font-semibold">{b.name}</div>{b.specialty && <span className="mt-0.5 inline-block rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">{b.specialty}</span>}{b.bio && <p className="mt-1.5 text-sm leading-relaxed text-stone-500">{b.bio}</p>}</div></div>{(b.work_photos || []).length > 0 && (<div className="mt-3"><div className="mb-1 text-xs font-medium text-stone-400">Their work</div><div className="flex gap-2 overflow-x-auto pb-1">{b.work_photos.map((url, i) => (<img key={i} src={url} alt="work" onClick={() => setLightbox(url)} className="h-20 w-20 shrink-0 cursor-pointer rounded-lg object-cover ring-1 ring-stone-200" />))}</div></div>)}<button onClick={() => { setBarber(b); setDate(null); setSlot(null); setStep("time"); }} className="mt-3 w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">Book with {b.name}</button></div>))}</div>}</>)}
+        {step === "barber" && (<><button onClick={() => setStep("service")} className="mt-6 text-sm font-medium text-stone-500">← Back</button><h2 className="mt-2 mb-1 text-lg font-semibold">Pick your barber</h2>{staff.length === 0 ? <p className="mt-3 rounded-xl bg-white p-4 text-stone-500 ring-1 ring-stone-200">This shop hasn't added barbers yet.</p> : <div className="space-y-3">{staff.map((b) => {
+          const avg = avgRating(b.name); const brevs = reviewsFor(b.name);
+          return (
+            <div key={b.id} className="rounded-2xl bg-white p-4 ring-1 ring-stone-200">
+              <div className="flex items-start gap-3">
+                <div className={`grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl ${b.color || "bg-emerald-700"} text-xl font-semibold text-white`}>{b.photo_url ? <img src={b.photo_url} alt={b.name} className="h-full w-full object-cover" /> : b.name[0]}</div>
+                <div className="flex-1">
+                  <div className="font-semibold">{b.name}</div>
+                  {b.specialty && <span className="mt-0.5 inline-block rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">{b.specialty}</span>}
+                  {avg != null && <div className="mt-1 flex items-center gap-1.5"><Stars value={avg} size="text-sm" /><span className="text-xs text-stone-500">{avg.toFixed(1)} ({brevs.length})</span></div>}
+                  {b.bio && <p className="mt-1.5 text-sm leading-relaxed text-stone-500">{b.bio}</p>}
+                </div>
+              </div>
+              {(b.work_photos || []).length > 0 && (<div className="mt-3"><div className="mb-1 text-xs font-medium text-stone-400">Their work</div><div className="flex gap-2 overflow-x-auto pb-1">{b.work_photos.map((url, i) => (<img key={i} src={url} alt="work" onClick={() => setLightbox(url)} className="h-20 w-20 shrink-0 cursor-pointer rounded-lg object-cover ring-1 ring-stone-200" />))}</div></div>)}
+              {brevs.length > 0 && (<div className="mt-3 border-t border-stone-100 pt-3"><div className="mb-1 text-xs font-medium text-stone-400">Reviews</div><div className="space-y-2">{brevs.slice(0, 3).map((r) => (<div key={r.id} className="rounded-lg bg-stone-50 p-2 ring-1 ring-stone-200"><div className="flex items-center justify-between"><span className="text-xs font-medium text-stone-700">{r.customer_name}</span><Stars value={r.rating} size="text-xs" /></div>{r.comment && <p className="mt-0.5 text-xs text-stone-500">{r.comment}</p>}</div>))}</div></div>)}
+              <button onClick={() => { setBarber(b); setDate(null); setSlot(null); setStep("time"); }} className="mt-3 w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">Book with {b.name}</button>
+            </div>
+          );
+        })}</div>}</>)}
 
         {step === "time" && (<><button onClick={() => { setStep("barber"); setDate(null); setSlot(null); }} className="mt-6 text-sm font-medium text-stone-500">← Back</button><h2 className="mt-2 mb-1 text-lg font-semibold">Pick a day &amp; time with {barber.name}</h2><p className="mb-3 text-sm text-stone-500">{service.name} · {service.mins} min</p>{dates.length === 0 ? <p className="mt-3 rounded-xl bg-white p-4 text-stone-500 ring-1 ring-stone-200">No working days set for this barber.</p> : <><div className="mb-3 flex gap-2 overflow-x-auto pb-1">{dates.map((d) => (<button key={d.key} onClick={() => { setDate(d); setSlot(null); }} className={`min-w-[68px] shrink-0 rounded-xl px-2 py-2 text-center ring-1 transition ${date?.key === d.key ? "bg-emerald-600 text-white ring-emerald-600" : "bg-white text-stone-700 ring-stone-200"}`}><div className="text-sm font-semibold">{d.label}</div><div className={`text-xs ${date?.key === d.key ? "text-emerald-100" : "text-stone-400"}`}>{d.sub}</div></button>))}</div>{!date ? <p className="text-sm text-stone-400">Pick a day above.</p> : loadingSlots ? <p className="text-sm text-stone-400">Checking…</p> : availableSlots.length === 0 ? <p className="rounded-xl bg-white p-4 text-stone-500 ring-1 ring-stone-200">Fully booked — try another day.</p> : <div className="grid grid-cols-3 gap-2">{availableSlots.map((m) => (<button key={m} onClick={() => setSlot(m)} className={`rounded-xl py-2.5 text-sm font-medium ring-1 transition ${slot === m ? "bg-emerald-600 text-white ring-emerald-600" : "bg-white text-stone-800 ring-stone-200 hover:ring-emerald-400"}`}>{toLabel(m)}</button>))}</div>}</>}<button disabled={slot === null || !date} onClick={() => setStep("details")} className="mt-4 w-full rounded-xl bg-emerald-600 py-3 font-semibold text-white transition enabled:hover:bg-emerald-700 disabled:opacity-40">Continue</button></>)}
 
@@ -260,11 +305,7 @@ export default function ShopBooking() {
             <div className="rounded-2xl bg-white p-4 ring-1 ring-stone-200">
               <p className="mb-3 text-sm text-stone-500">A ${shop.deposit_amount} deposit confirms your booking with {barber.name}.</p>
               <Elements stripe={stripeForAccount} options={{ clientSecret }}>
-                <DepositForm
-                  amount={shop.deposit_amount}
-                  onPaid={async (paymentIntentId) => { const ok = await saveBooking(true, paymentIntentId); if (ok) setStep("done"); }}
-                  onCancel={() => { setStep("details"); setClientSecret(null); setStripeForAccount(null); }}
-                />
+                <DepositForm amount={shop.deposit_amount} onPaid={async (paymentIntentId) => { const ok = await saveBooking(true, paymentIntentId); if (ok) setStep("done"); }} onCancel={() => { setStep("details"); setClientSecret(null); setStripeForAccount(null); }} />
               </Elements>
             </div>
           </>

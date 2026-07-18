@@ -217,7 +217,11 @@ export default function Dashboard() {
       <div className="mx-auto max-w-2xl px-4 py-8">
         <div className="flex items-start justify-between">
           <div><h1 className="text-2xl font-bold">{shop.name}</h1><p className="text-sm text-stone-500">kursey.com/{shop.slug}</p></div>
-          <div className="flex items-center gap-2"><a href="/settings" className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-300">Settings</a><button onClick={handleLogout} className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-300">Log out</button></div>
+          <div className="flex items-center gap-2">
+            <a href="/analytics" className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-300">Analytics</a>
+            <a href="/settings" className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-300">Settings</a>
+            <button onClick={handleLogout} className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-300">Log out</button>
+          </div>
         </div>
 
         {isActive ? (<div className="mt-4 flex items-center justify-between rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-200"><div><div className="font-semibold text-emerald-800">Subscription active ✓</div><div className="text-sm text-emerald-700">Thanks for being a Kursey member.</div></div></div>)
