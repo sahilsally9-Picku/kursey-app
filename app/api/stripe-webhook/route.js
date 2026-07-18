@@ -7,18 +7,32 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
-async function markActiveBySubscription(subscriptionId) {
-  if (!subscriptionId) return;
-  // get the subscription to read its shop_id metadata
-  const sub = await stripe.subscriptions.retrieve(subscriptionId);
-  const shopId = sub.metadata?.shop_id;
+async function activateShop({ shopId, customerId, subscriptionId }) {
+  // try to find the shop by any identifier we have
+  let shop = null;
+
   if (shopId) {
+    const r = await supabase.from("shops").select("id").eq("id", shopId).single();
+    shop = r.data;
+  }
+  if (!shop && subscriptionId) {
+    const r = await supabase.from("shops").select("id").eq("stripe_subscription_id", subscriptionId).single();
+    shop = r.data;
+  }
+  if (!shop && customerId) {
+    const r = await supabase.from("shops").select("id").eq("stripe_customer_id", customerId).single();
+    shop = r.data;
+  }
+
+  if (shop) {
     await supabase.from("shops").update({
       subscription_status: "active",
-      stripe_customer_id: sub.customer,
-      stripe_subscription_id: sub.id,
-    }).eq("id", shopId);
+      stripe_customer_id: customerId || undefined,
+      stripe_subscription_id: subscriptionId || undefined,
+    }).eq("id", shop.id);
+    return true;
   }
+  return false;
 }
 
 export async function POST(request) {
@@ -29,46 +43,50 @@ export async function POST(request) {
   try {
     event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
-    return Response.json({ error: `Webhook signature failed: ${err.message}` }, { status: 400 });
+    return Response.json({ error: `Signature failed: ${err.message}` }, { status: 400 });
   }
 
   try {
-    // subscription paid (first payment or renewal) → active
-    if (event.type === "invoice.paid") {
-      const invoice = event.data.object;
-      await markActiveBySubscription(invoice.subscription);
-    }
-
-    // also handle checkout completion directly (belt and suspenders)
     if (event.type === "checkout.session.completed") {
-      const session = event.data.object;
-      const shopId = session.metadata?.shop_id || session.client_reference_id;
-      if (shopId) {
-        await supabase.from("shops").update({
-          subscription_status: "active",
-          stripe_customer_id: session.customer,
-          stripe_subscription_id: session.subscription,
-        }).eq("id", shopId);
-      }
+      const s = event.data.object;
+      const ok = await activateShop({
+        shopId: s.metadata?.shop_id || s.client_reference_id,
+        customerId: s.customer,
+        subscriptionId: s.subscription,
+      });
+      return Response.json({ received: true, activated: ok, via: "checkout" });
     }
 
-    // payment failed → past_due
+    if (event.type === "invoice.paid") {
+      const inv = event.data.object;
+      let shopId = null;
+      // try to read shop_id from the subscription's metadata
+      if (inv.subscription) {
+        try { const sub = await stripe.subscriptions.retrieve(inv.subscription); shopId = sub.metadata?.shop_id; } catch (e) {}
+      }
+      const ok = await activateShop({
+        shopId,
+        customerId: inv.customer,
+        subscriptionId: inv.subscription,
+      });
+      return Response.json({ received: true, activated: ok, via: "invoice.paid" });
+    }
+
     if (event.type === "invoice.payment_failed") {
-      const invoice = event.data.object;
-      if (invoice.subscription) {
-        await supabase.from("shops").update({ subscription_status: "past_due" })
-          .eq("stripe_subscription_id", invoice.subscription);
+      const inv = event.data.object;
+      if (inv.subscription) {
+        await supabase.from("shops").update({ subscription_status: "past_due" }).eq("stripe_subscription_id", inv.subscription);
       }
+      return Response.json({ received: true });
     }
 
-    // subscription cancelled → past_due
     if (event.type === "customer.subscription.deleted") {
       const sub = event.data.object;
-      await supabase.from("shops").update({ subscription_status: "past_due" })
-        .eq("stripe_subscription_id", sub.id);
+      await supabase.from("shops").update({ subscription_status: "past_due" }).eq("stripe_subscription_id", sub.id);
+      return Response.json({ received: true });
     }
 
-    return Response.json({ received: true });
+    return Response.json({ received: true, ignored: event.type });
   } catch (err) {
     return Response.json({ error: err.message }, { status: 500 });
   }
