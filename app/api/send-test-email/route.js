@@ -1,14 +1,13 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function POST(request) {
   try {
+    const resend = new Resend(process.env.RESEND_API_KEY);
     const { to } = await request.json();
     if (!to) return Response.json({ error: "Missing 'to' email" }, { status: 400 });
 
     const { data, error } = await resend.emails.send({
-      from: "Kursey <onboarding@resend.dev>",   // test sender for now
+      from: "Kursey <onboarding@resend.dev>",
       to: [to],
       subject: "Test reminder from Kursey",
       html: `
