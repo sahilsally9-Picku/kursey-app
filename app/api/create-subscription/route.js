@@ -15,13 +15,13 @@ export async function POST(request) {
     const { data: shop } = await supabase.from("shops").select("*").eq("id", shopId).single();
     if (!shop) return Response.json({ error: "Shop not found" }, { status: 404 });
 
-    // create a Stripe Checkout session for the subscription
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
-      customer_email: undefined,
       client_reference_id: shopId,
       metadata: { shop_id: shopId },
+      // tag the subscription + customer so later invoices know the shop
+      subscription_data: { metadata: { shop_id: shopId } },
       success_url: `${origin}/dashboard?sub=success`,
       cancel_url: `${origin}/dashboard?sub=cancelled`,
     });
