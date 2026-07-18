@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { supabase } from "../../lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -12,7 +12,7 @@ const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const TIMES = [];
 for (let h = 0; h < 24; h++) for (let m of [0, 30]) TIMES.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
 
-export default function Settings() {
+function SettingsInner() {
   const [checking, setChecking] = useState(true);
   const [shop, setShop] = useState(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -68,13 +68,11 @@ export default function Settings() {
     return supabase.storage.from("images").getPublicUrl(path).data.publicUrl;
   }
 
-  // ---------- STRIPE / DEPOSITS ----------
   async function connectStripe() {
     setConnecting(true);
     try {
       const res = await fetch("/api/connect-stripe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ shopId: shop.id, origin: window.location.origin }),
       });
       const data = await res.json();
@@ -225,5 +223,13 @@ export default function Settings() {
         {staff.length > 0 && <div className="mt-2 space-y-2">{staff.map((st) => (<div key={st.id} className="flex items-center justify-between rounded-xl bg-white p-4 ring-1 ring-stone-200"><div className="flex items-center gap-3"><div className={`grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full ${st.color || "bg-emerald-700"} font-semibold text-white`}>{st.photo_url ? <img src={st.photo_url} alt="" className="h-full w-full object-cover" /> : st.name[0]}</div><div><div className="font-medium">{st.name}</div><div className="text-xs text-stone-500">{(st.work_photos || []).length} work photo{(st.work_photos || []).length === 1 ? "" : "s"}</div></div></div><div className="flex items-center gap-3"><button onClick={() => startEditStaff(st)} className="text-sm text-emerald-700 hover:underline">Edit</button><button onClick={() => deleteStaff(st.id)} className="text-sm text-red-600 hover:underline">Remove</button></div></div>))}</div>}
       </div>
     </div>
+  );
+}
+
+export default function Settings() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-stone-100 text-stone-500">Loading…</div>}>
+      <SettingsInner />
+    </Suspense>
   );
 }
