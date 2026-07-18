@@ -42,8 +42,7 @@ function SettingsInner() {
   const [stBreaks, setStBreaks] = useState([]); const [brStart, setBrStart] = useState("13:00"); const [brEnd, setBrEnd] = useState("14:00");
   const [editStaffId, setEditStaffId] = useState(null);
 
-  // barber login state
-  const [loginFor, setLoginFor] = useState(null); // staff id we're setting a login for
+  const [loginFor, setLoginFor] = useState(null);
   const [loginEmail, setLoginEmail] = useState(""); const [loginPass, setLoginPass] = useState("");
   const [creatingLogin, setCreatingLogin] = useState(false);
 
@@ -152,102 +151,104 @@ function SettingsInner() {
     setCreatingLogin(false);
   }
 
-  if (checking) return <div className="flex min-h-screen items-center justify-center bg-stone-100 text-stone-500">Loading…</div>;
+  if (checking) return <div className="flex min-h-screen items-center justify-center text-stone-300">Loading…</div>;
 
-  const input = "w-full rounded-xl bg-white px-4 py-3 text-sm text-stone-900 outline-none ring-1 ring-stone-300 placeholder:text-stone-400 focus:ring-emerald-500";
-  const select = "rounded-xl bg-white px-3 py-3 text-sm text-stone-900 outline-none ring-1 ring-stone-300 focus:ring-emerald-500";
+  const input = "w-full rounded-xl bg-white/95 px-4 py-3 text-sm text-stone-900 outline-none ring-1 ring-white/20 placeholder:text-stone-400 focus:ring-amber-500";
+  const select = "rounded-xl bg-white/95 px-3 py-3 text-sm text-stone-900 outline-none ring-1 ring-white/20 focus:ring-amber-500";
+  const card = "rounded-2xl bg-stone-900/75 ring-1 ring-white/15 backdrop-blur-md";
+  const btnGold = "rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 font-semibold text-white shadow-lg transition enabled:hover:from-amber-700 enabled:hover:to-amber-600 disabled:opacity-40";
   const connected = !!shop.stripe_account_id;
   const justReturned = searchParams.get("stripe") === "done";
 
   return (
-    <div className="min-h-screen bg-stone-100 text-stone-900">
+    <div className="min-h-screen text-white">
       <div className="mx-auto max-w-lg px-4 py-8">
         <div className="flex items-center justify-between">
-          <div><h1 className="text-2xl font-bold">Settings</h1><p className="text-sm text-stone-500">{shop.name} · kursey.com/{shop.slug}</p></div>
-          <a href="/dashboard" className="text-sm font-medium text-emerald-700 hover:underline">← Dashboard</a>
+          <div><h1 className="font-display text-3xl font-bold tracking-tight">Settings</h1><p className="text-sm text-stone-300">{shop.name} · kursey.com/{shop.slug}</p></div>
+          <a href="/dashboard" className="text-sm font-medium text-amber-400 hover:underline">← Dashboard</a>
         </div>
 
         {/* PAYMENTS / DEPOSITS */}
-        <h2 className="mt-6 mb-2 text-lg font-semibold">Payments &amp; deposits</h2>
-        <div className="rounded-2xl bg-white p-4 ring-1 ring-stone-200">
-          {justReturned && <p className="mb-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">Returned from Stripe. If setup is complete, you're ready to take deposits.</p>}
+        <h2 className="mt-6 mb-2 font-display text-xl font-semibold">Payments &amp; deposits</h2>
+        <div className={`p-4 ${card}`}>
+          {justReturned && <p className="mb-2 rounded-lg bg-amber-500/15 px-3 py-2 text-sm text-amber-200 ring-1 ring-amber-400/30">Returned from Stripe. If setup is complete, you're ready to take deposits.</p>}
           {!connected ? (
             <>
-              <p className="text-sm text-stone-600">Connect your Stripe to take deposits. Money goes straight to your account — Kursey never touches it.</p>
-              <button onClick={connectStripe} disabled={connecting} className="mt-3 rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white transition enabled:hover:bg-indigo-700 disabled:opacity-40">{connecting ? "Opening Stripe…" : "Connect Stripe"}</button>
+              <p className="text-sm text-stone-300">Connect your Stripe to take deposits. Money goes straight to your account — Kursey never touches it.</p>
+              <button onClick={connectStripe} disabled={connecting} className={`mt-3 px-5 py-3 ${btnGold}`}>{connecting ? "Opening Stripe…" : "Connect Stripe"}</button>
             </>
           ) : (
             <>
-              <div className="flex items-center gap-2 text-sm font-medium text-emerald-700">✓ Stripe connected</div>
-              <div className="mt-3 flex items-center justify-between rounded-xl bg-stone-50 p-3 ring-1 ring-stone-200">
-                <div><div className="font-medium">Require a deposit to book</div><div className="text-xs text-stone-500">Customers pay upfront to confirm.</div></div>
-                <button onClick={toggleDeposits} className={`relative h-6 w-11 rounded-full transition ${shop.deposits_enabled ? "bg-emerald-600" : "bg-stone-300"}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${shop.deposits_enabled ? "left-[22px]" : "left-0.5"}`} /></button>
+              <div className="flex items-center gap-2 text-sm font-medium text-amber-400">✓ Stripe connected</div>
+              <div className="mt-3 flex items-center justify-between rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
+                <div><div className="font-medium">Require a deposit to book</div><div className="text-xs text-stone-400">Customers pay upfront to confirm.</div></div>
+                <button onClick={toggleDeposits} className={`relative h-6 w-11 rounded-full transition ${shop.deposits_enabled ? "bg-amber-500" : "bg-white/20"}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${shop.deposits_enabled ? "left-[22px]" : "left-0.5"}`} /></button>
               </div>
-              {shop.deposits_enabled && (<div className="mt-3 flex items-end gap-2"><div><div className="mb-1 text-xs font-medium text-stone-500">Deposit amount ($)</div><input value={depAmount} onChange={(e) => setDepAmount(e.target.value)} type="number" className={`${input} w-32`} /></div><button onClick={saveDeposit} disabled={savingDep} className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">{savingDep ? "Saving…" : "Save"}</button>{depSaved && <span className="pb-3 text-sm font-medium text-emerald-600">Saved ✓</span>}</div>)}
+              {shop.deposits_enabled && (<div className="mt-3 flex items-end gap-2"><div><div className="mb-1 text-xs font-medium text-stone-300">Deposit amount ($)</div><input value={depAmount} onChange={(e) => setDepAmount(e.target.value)} type="number" className={`${input} w-32`} /></div><button onClick={saveDeposit} disabled={savingDep} className={`px-4 py-3 text-sm ${btnGold}`}>{savingDep ? "Saving…" : "Save"}</button>{depSaved && <span className="pb-3 text-sm font-medium text-amber-300">Saved ✓</span>}</div>)}
               <button onClick={connectStripe} className="mt-3 block text-xs text-stone-400 hover:underline">Re-open Stripe setup</button>
             </>
           )}
         </div>
 
         {/* BUSINESS INFO */}
-        <h2 className="mt-8 mb-2 text-lg font-semibold">Business info</h2>
-        <div className="rounded-2xl bg-white p-4 ring-1 ring-stone-200">
+        <h2 className="mt-8 mb-2 font-display text-xl font-semibold">Business info</h2>
+        <div className={`p-4 ${card}`}>
           <div className="space-y-2"><input value={bName} onChange={(e) => setBName(e.target.value)} placeholder="Business name" className={input} /><textarea value={bDesc} onChange={(e) => setBDesc(e.target.value)} placeholder="Describe your business" rows={3} className={`${input} resize-none`} /><input value={bAddress} onChange={(e) => setBAddress(e.target.value)} placeholder="Address" className={input} /><input value={bPhone} onChange={(e) => setBPhone(e.target.value)} placeholder="Phone" className={input} /></div>
-          <div className="mt-3 flex items-center gap-3"><button disabled={savingInfo || !bName} onClick={saveInfo} className="rounded-xl bg-emerald-600 px-5 py-3 font-semibold text-white transition enabled:hover:bg-emerald-700 disabled:opacity-40">{savingInfo ? "Saving…" : "Save info"}</button>{infoSaved && <span className="text-sm font-medium text-emerald-600">Saved ✓</span>}</div>
+          <div className="mt-3 flex items-center gap-3"><button disabled={savingInfo || !bName} onClick={saveInfo} className={`px-5 py-3 ${btnGold}`}>{savingInfo ? "Saving…" : "Save info"}</button>{infoSaved && <span className="text-sm font-medium text-amber-300">Saved ✓</span>}</div>
         </div>
 
         {/* LOGO */}
-        <h2 className="mt-8 mb-2 text-lg font-semibold">Shop logo</h2>
-        <div className="flex items-center gap-4 rounded-2xl bg-white p-4 ring-1 ring-stone-200">
-          <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-emerald-600 text-2xl font-bold text-white">{shop.logo_url ? <img src={shop.logo_url} alt="logo" className="h-full w-full object-cover" /> : (shop.name[0] || "K")}</div>
-          <div className="flex-1"><label className="inline-block cursor-pointer rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">{uploadingLogo ? "Uploading…" : shop.logo_url ? "Replace logo" : "Upload logo"}<input type="file" accept="image/*" className="hidden" onChange={(e) => uploadLogo(e.target.files[0])} disabled={uploadingLogo} /></label>{shop.logo_url && <button onClick={removeLogo} className="ml-3 text-sm text-red-600 hover:underline">Remove</button>}</div>
+        <h2 className="mt-8 mb-2 font-display text-xl font-semibold">Shop logo</h2>
+        <div className={`flex items-center gap-4 p-4 ${card}`}>
+          <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-gradient-to-br from-amber-600 to-amber-800 text-2xl font-bold text-white">{shop.logo_url ? <img src={shop.logo_url} alt="logo" className="h-full w-full object-cover" /> : (shop.name[0] || "K")}</div>
+          <div className="flex-1"><label className={`inline-block cursor-pointer px-4 py-2 text-sm ${btnGold}`}>{uploadingLogo ? "Uploading…" : shop.logo_url ? "Replace logo" : "Upload logo"}<input type="file" accept="image/*" className="hidden" onChange={(e) => uploadLogo(e.target.files[0])} disabled={uploadingLogo} /></label>{shop.logo_url && <button onClick={removeLogo} className="ml-3 text-sm text-red-300 hover:underline">Remove</button>}</div>
         </div>
 
         {/* SERVICES */}
-        <h2 className="mt-8 mb-2 text-lg font-semibold">Services ({services.length})</h2>
-        <div className={`rounded-2xl bg-white p-4 ring-1 ${editServiceId ? "ring-emerald-400" : "ring-stone-200"}`}>
-          {editServiceId && <p className="mb-2 text-sm font-medium text-emerald-700">Editing service…</p>}
+        <h2 className="mt-8 mb-2 font-display text-xl font-semibold">Services ({services.length})</h2>
+        <div className={`p-4 ${editServiceId ? "rounded-2xl bg-stone-900/75 ring-1 ring-amber-400/50 backdrop-blur-md" : card}`}>
+          {editServiceId && <p className="mb-2 text-sm font-medium text-amber-400">Editing service…</p>}
           <div className="space-y-2"><input value={sName} onChange={(e) => setSName(e.target.value)} placeholder="Service name" className={input} /><div className="flex gap-2"><input value={sPrice} onChange={(e) => setSPrice(e.target.value)} placeholder="Price $" type="number" className={input} /><input value={sMins} onChange={(e) => setSMins(e.target.value)} placeholder="Minutes" type="number" className={input} /></div><textarea value={sDesc} onChange={(e) => setSDesc(e.target.value)} placeholder="Description (optional)" rows={2} className={`${input} resize-none`} /></div>
-          <div className="mt-3 flex gap-2"><button disabled={!sName || !sPrice} onClick={saveService} className="flex-1 rounded-xl bg-emerald-600 py-3 font-semibold text-white transition enabled:hover:bg-emerald-700 disabled:opacity-40">{editServiceId ? "Save changes" : "Add service"}</button>{editServiceId && <button onClick={resetServiceForm} className="rounded-xl bg-stone-200 px-4 py-3 text-sm font-medium text-stone-700">Cancel</button>}</div>
+          <div className="mt-3 flex gap-2"><button disabled={!sName || !sPrice} onClick={saveService} className={`flex-1 py-3 ${btnGold}`}>{editServiceId ? "Save changes" : "Add service"}</button>{editServiceId && <button onClick={resetServiceForm} className="rounded-xl bg-white/10 px-4 py-3 text-sm font-medium text-stone-200">Cancel</button>}</div>
         </div>
-        {services.length > 0 && <div className="mt-2 space-y-2">{services.map((s) => (<div key={s.id} className="flex items-start justify-between rounded-xl bg-white p-4 ring-1 ring-stone-200"><div className="pr-3"><div className="font-medium">{s.name}</div><div className="text-sm text-stone-500">{s.mins} min · ${s.price}</div>{s.description && <div className="mt-0.5 text-xs text-stone-400">{s.description}</div>}</div><div className="flex shrink-0 items-center gap-3"><button onClick={() => startEditService(s)} className="text-sm text-emerald-700 hover:underline">Edit</button><button onClick={() => deleteService(s.id)} className="text-sm text-red-600 hover:underline">Remove</button></div></div>))}</div>}
+        {services.length > 0 && <div className="mt-2 space-y-2">{services.map((s) => (<div key={s.id} className={`flex items-start justify-between p-4 ${card}`}><div className="pr-3"><div className="font-medium">{s.name}</div><div className="text-sm text-stone-300">{s.mins} min · ${s.price}</div>{s.description && <div className="mt-0.5 font-display text-xs italic text-stone-400">{s.description}</div>}</div><div className="flex shrink-0 items-center gap-3"><button onClick={() => startEditService(s)} className="text-sm text-amber-400 hover:underline">Edit</button><button onClick={() => deleteService(s.id)} className="text-sm text-red-300 hover:underline">Remove</button></div></div>))}</div>}
 
         {/* STAFF */}
-        <h2 className="mt-8 mb-2 text-lg font-semibold">Barbers / staff ({staff.length})</h2>
-        <div className={`rounded-2xl bg-white p-4 ring-1 ${editStaffId ? "ring-emerald-400" : "ring-stone-200"}`}>
-          {editStaffId && <p className="mb-2 text-sm font-medium text-emerald-700">Editing barber…</p>}
+        <h2 className="mt-8 mb-2 font-display text-xl font-semibold">Barbers / staff ({staff.length})</h2>
+        <div className={`p-4 ${editStaffId ? "rounded-2xl bg-stone-900/75 ring-1 ring-amber-400/50 backdrop-blur-md" : card}`}>
+          {editStaffId && <p className="mb-2 text-sm font-medium text-amber-400">Editing barber…</p>}
           <div className="space-y-2">
-            <div className="flex items-center gap-3"><div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full bg-stone-200 text-xs text-stone-400">{stPhoto ? <img src={stPhoto} alt="" className="h-full w-full object-cover" /> : "Photo"}</div><label className="cursor-pointer rounded-xl bg-stone-800 px-3 py-2 text-sm font-semibold text-white">{uploadingPhoto ? "Uploading…" : stPhoto ? "Change photo" : "Upload photo"}<input type="file" accept="image/*" className="hidden" onChange={(e) => uploadStaffPhoto(e.target.files[0])} disabled={uploadingPhoto} /></label>{stPhoto && <button onClick={() => setStPhoto("")} className="text-sm text-red-600 hover:underline">Remove</button>}</div>
+            <div className="flex items-center gap-3"><div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full bg-white/10 text-xs text-stone-400">{stPhoto ? <img src={stPhoto} alt="" className="h-full w-full object-cover" /> : "Photo"}</div><label className="cursor-pointer rounded-xl bg-white/15 px-3 py-2 text-sm font-semibold text-white ring-1 ring-white/20">{uploadingPhoto ? "Uploading…" : stPhoto ? "Change photo" : "Upload photo"}<input type="file" accept="image/*" className="hidden" onChange={(e) => uploadStaffPhoto(e.target.files[0])} disabled={uploadingPhoto} /></label>{stPhoto && <button onClick={() => setStPhoto("")} className="text-sm text-red-300 hover:underline">Remove</button>}</div>
             <input value={stName} onChange={(e) => setStName(e.target.value)} placeholder="Name (e.g. Marcus)" className={input} />
             <input value={stSpecialty} onChange={(e) => setStSpecialty(e.target.value)} placeholder="Specialty" className={input} />
             <textarea value={stBio} onChange={(e) => setStBio(e.target.value)} placeholder="About this barber" rows={3} className={`${input} resize-none`} />
-            <div className="pt-1"><div className="mb-1 text-xs font-medium text-stone-500">Work photos</div><div className="flex flex-wrap gap-2">{stWork.map((url, i) => (<div key={i} className="relative h-16 w-16 overflow-hidden rounded-lg ring-1 ring-stone-200"><img src={url} alt="" className="h-full w-full object-cover" /><button onClick={() => removeWorkPhoto(i)} className="absolute right-0 top-0 grid h-5 w-5 place-items-center rounded-bl-lg bg-black/60 text-xs text-white">✕</button></div>))}<label className="grid h-16 w-16 cursor-pointer place-items-center rounded-lg bg-stone-100 text-2xl text-stone-400 ring-1 ring-dashed ring-stone-300 hover:bg-stone-200">{uploadingWork ? "…" : "+"}<input type="file" accept="image/*" className="hidden" onChange={(e) => uploadWorkPhoto(e.target.files[0])} disabled={uploadingWork} /></label></div></div>
-            <div className="pt-1"><div className="mb-1 text-xs font-medium text-stone-500">Working days</div><div className="flex flex-wrap gap-1.5">{DAYS.map((d) => (<button key={d} onClick={() => toggleDay(d)} className={`rounded-lg px-3 py-1.5 text-sm ring-1 transition ${stDays.includes(d) ? "bg-emerald-600 text-white ring-emerald-600" : "bg-white text-stone-600 ring-stone-300"}`}>{d}</button>))}</div></div>
-            <div className="flex items-center gap-2 pt-1"><div className="flex-1"><div className="mb-1 text-xs font-medium text-stone-500">Start</div><select value={stStart} onChange={(e) => setStStart(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div><div className="flex-1"><div className="mb-1 text-xs font-medium text-stone-500">End</div><select value={stEnd} onChange={(e) => setStEnd(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div></div>
-            <div className="pt-1"><div className="mb-1 text-xs font-medium text-stone-500">Breaks (optional)</div><div className="flex items-end gap-2"><div className="flex-1"><select value={brStart} onChange={(e) => setBrStart(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div><span className="pb-3 text-stone-400">–</span><div className="flex-1"><select value={brEnd} onChange={(e) => setBrEnd(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div><button onClick={addBreakToForm} className="mb-0.5 rounded-xl bg-stone-800 px-3 py-3 text-sm font-semibold text-white">+ Break</button></div>{stBreaks.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{stBreaks.map((b, i) => (<span key={i} className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-800 ring-1 ring-amber-200">{b}<button onClick={() => removeBreakFromForm(i)} className="text-amber-600 hover:text-amber-900">✕</button></span>))}</div>}</div>
-            <div className="flex flex-wrap gap-2 pt-1">{colors.map((c) => (<button key={c.value} onClick={() => setStColor(c.value)} className={`h-8 w-8 rounded-full ${c.value} ${stColor === c.value ? "ring-2 ring-offset-2 ring-stone-900" : ""}`} title={c.label} />))}</div>
+            <div className="pt-1"><div className="mb-1 text-xs font-medium text-stone-300">Work photos</div><div className="flex flex-wrap gap-2">{stWork.map((url, i) => (<div key={i} className="relative h-16 w-16 overflow-hidden rounded-lg ring-1 ring-white/15"><img src={url} alt="" className="h-full w-full object-cover" /><button onClick={() => removeWorkPhoto(i)} className="absolute right-0 top-0 grid h-5 w-5 place-items-center rounded-bl-lg bg-black/60 text-xs text-white">✕</button></div>))}<label className="grid h-16 w-16 cursor-pointer place-items-center rounded-lg bg-white/5 text-2xl text-stone-400 ring-1 ring-dashed ring-white/25 hover:bg-white/10">{uploadingWork ? "…" : "+"}<input type="file" accept="image/*" className="hidden" onChange={(e) => uploadWorkPhoto(e.target.files[0])} disabled={uploadingWork} /></label></div></div>
+            <div className="pt-1"><div className="mb-1 text-xs font-medium text-stone-300">Working days</div><div className="flex flex-wrap gap-1.5">{DAYS.map((d) => (<button key={d} onClick={() => toggleDay(d)} className={`rounded-lg px-3 py-1.5 text-sm ring-1 transition ${stDays.includes(d) ? "bg-amber-600 text-white ring-amber-500" : "bg-white/10 text-stone-200 ring-white/20"}`}>{d}</button>))}</div></div>
+            <div className="flex items-center gap-2 pt-1"><div className="flex-1"><div className="mb-1 text-xs font-medium text-stone-300">Start</div><select value={stStart} onChange={(e) => setStStart(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div><div className="flex-1"><div className="mb-1 text-xs font-medium text-stone-300">End</div><select value={stEnd} onChange={(e) => setStEnd(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div></div>
+            <div className="pt-1"><div className="mb-1 text-xs font-medium text-stone-300">Breaks (optional)</div><div className="flex items-end gap-2"><div className="flex-1"><select value={brStart} onChange={(e) => setBrStart(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div><span className="pb-3 text-stone-400">–</span><div className="flex-1"><select value={brEnd} onChange={(e) => setBrEnd(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div><button onClick={addBreakToForm} className="mb-0.5 rounded-xl bg-white/15 px-3 py-3 text-sm font-semibold text-white ring-1 ring-white/20">+ Break</button></div>{stBreaks.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{stBreaks.map((b, i) => (<span key={i} className="flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-1 text-xs text-amber-200 ring-1 ring-amber-400/30">{b}<button onClick={() => removeBreakFromForm(i)} className="text-amber-300 hover:text-amber-100">✕</button></span>))}</div>}</div>
+            <div className="flex flex-wrap gap-2 pt-1">{colors.map((c) => (<button key={c.value} onClick={() => setStColor(c.value)} className={`h-8 w-8 rounded-full ${c.value} ${stColor === c.value ? "ring-2 ring-offset-2 ring-offset-stone-900 ring-white" : ""}`} title={c.label} />))}</div>
           </div>
-          <div className="mt-3 flex gap-2"><button disabled={!stName} onClick={saveStaff} className="flex-1 rounded-xl bg-emerald-600 py-3 font-semibold text-white transition enabled:hover:bg-emerald-700 disabled:opacity-40">{editStaffId ? "Save changes" : "Add barber"}</button>{editStaffId && <button onClick={resetStaffForm} className="rounded-xl bg-stone-200 px-4 py-3 text-sm font-medium text-stone-700">Cancel</button>}</div>
+          <div className="mt-3 flex gap-2"><button disabled={!stName} onClick={saveStaff} className={`flex-1 py-3 ${btnGold}`}>{editStaffId ? "Save changes" : "Add barber"}</button>{editStaffId && <button onClick={resetStaffForm} className="rounded-xl bg-white/10 px-4 py-3 text-sm font-medium text-stone-200">Cancel</button>}</div>
         </div>
         {staff.length > 0 && <div className="mt-2 space-y-2">{staff.map((st) => (
-          <div key={st.id} className="rounded-xl bg-white p-4 ring-1 ring-stone-200">
+          <div key={st.id} className={`p-4 ${card}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className={`grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full ${st.color || "bg-emerald-700"} font-semibold text-white`}>{st.photo_url ? <img src={st.photo_url} alt="" className="h-full w-full object-cover" /> : st.name[0]}</div>
-                <div><div className="font-medium">{st.name}</div><div className="text-xs text-stone-500">{st.login_email ? `Login: ${st.login_email}` : "No login yet"}</div></div>
+                <div><div className="font-medium">{st.name}</div><div className="text-xs text-stone-400">{st.login_email ? `Login: ${st.login_email}` : "No login yet"}</div></div>
               </div>
-              <div className="flex items-center gap-3"><button onClick={() => startEditStaff(st)} className="text-sm text-emerald-700 hover:underline">Edit</button><button onClick={() => deleteStaff(st.id)} className="text-sm text-red-600 hover:underline">Remove</button></div>
+              <div className="flex items-center gap-3"><button onClick={() => startEditStaff(st)} className="text-sm text-amber-400 hover:underline">Edit</button><button onClick={() => deleteStaff(st.id)} className="text-sm text-red-300 hover:underline">Remove</button></div>
             </div>
-            <div className="mt-2 border-t border-stone-100 pt-2">
+            <div className="mt-2 border-t border-white/10 pt-2">
               {loginFor === st.id ? (
                 <div className="space-y-2">
-                  <div className="text-xs font-medium text-stone-500">{st.login_email ? "Reset this barber's login" : "Create a login for this barber"}</div>
+                  <div className="text-xs font-medium text-stone-300">{st.login_email ? "Reset this barber's login" : "Create a login for this barber"}</div>
                   <input value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder="Barber's email" type="email" className={input} />
                   <input value={loginPass} onChange={(e) => setLoginPass(e.target.value)} placeholder="Password (min 6)" type="password" className={input} />
-                  <div className="flex gap-2"><button onClick={createBarberLogin} disabled={creatingLogin} className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{creatingLogin ? "Creating…" : "Create login"}</button><button onClick={() => setLoginFor(null)} className="rounded-xl bg-stone-200 px-4 py-2.5 text-sm font-medium text-stone-700">Cancel</button></div>
+                  <div className="flex gap-2"><button onClick={createBarberLogin} disabled={creatingLogin} className={`flex-1 py-2.5 text-sm ${btnGold}`}>{creatingLogin ? "Creating…" : "Create login"}</button><button onClick={() => setLoginFor(null)} className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-medium text-stone-200">Cancel</button></div>
                 </div>
               ) : (
-                <button onClick={() => openLoginForm(st)} className="text-sm font-medium text-indigo-700 hover:underline">{st.login_email ? "Reset login" : "+ Set up login"}</button>
+                <button onClick={() => openLoginForm(st)} className="text-sm font-medium text-amber-400 hover:underline">{st.login_email ? "Reset login" : "+ Set up login"}</button>
               )}
             </div>
           </div>
@@ -259,7 +260,7 @@ function SettingsInner() {
 
 export default function Settings() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-stone-100 text-stone-500">Loading…</div>}>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-stone-300">Loading…</div>}>
       <SettingsInner />
     </Suspense>
   );

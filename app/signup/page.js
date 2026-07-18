@@ -13,7 +13,6 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // turn "Fade & Co" into "fade-co" as they type the shop name
   function onShopName(v) {
     setShopName(v);
     setSlug(v.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""));
@@ -24,11 +23,9 @@ export default function Signup() {
     if (!shopName || !slug || !email || !password) { setError("Please fill everything in."); return; }
     setLoading(true);
 
-    // 1. create the user account
     const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({ email, password });
     if (signUpErr) { setLoading(false); setError(signUpErr.message); return; }
 
-    // 2. make sure we have a session (log them in)
     let userId = signUpData.user?.id;
     if (!signUpData.session) {
       const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
@@ -36,7 +33,6 @@ export default function Signup() {
       userId = signInData.user?.id;
     }
 
-    // 3. create their shop
     const { error: shopErr } = await supabase.from("shops").insert({
       owner_id: userId, name: shopName, slug: slug,
     });
@@ -50,38 +46,37 @@ export default function Signup() {
       return;
     }
 
-    // 4. done → go to their dashboard
     router.push("/dashboard");
   }
 
-  const input = "w-full rounded-xl bg-white px-4 py-3 text-sm text-stone-900 outline-none ring-1 ring-stone-300 placeholder:text-stone-400 focus:ring-emerald-500";
+  const input = "w-full rounded-xl bg-white/95 px-4 py-3 text-sm text-stone-900 outline-none ring-1 ring-white/20 placeholder:text-stone-400 focus:ring-amber-500";
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-stone-100 px-4 py-10">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-200">
-        <div className="mb-4 grid h-12 w-12 place-items-center rounded-xl bg-emerald-600 text-xl font-bold text-white">K</div>
-        <h1 className="text-xl font-bold text-stone-900">Start your shop on Kursey</h1>
-        <p className="mb-4 text-sm text-stone-500">Create your account and booking page.</p>
+    <div className="flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="w-full max-w-sm rounded-3xl bg-white/10 p-7 shadow-2xl ring-1 ring-white/15 backdrop-blur-md">
+        <img src="/logo.png" alt="Kursey" className="mb-5 h-12 w-auto rounded-xl" />
+        <h1 className="text-xl font-bold text-white">Start your shop on Kursey</h1>
+        <p className="mb-5 text-sm text-stone-300">Create your account and booking page.</p>
 
         <div className="space-y-2">
           <input value={shopName} onChange={(e) => onShopName(e.target.value)} placeholder="Shop name (e.g. Fade & Co)" className={input} />
           <div>
             <input value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} placeholder="link-name" className={input} />
-            <p className="mt-1 text-xs text-stone-400">Your booking link: kursey.com/{slug || "your-shop"}</p>
+            <p className="mt-1 text-xs text-stone-300">Your booking link: kursey.com/{slug || "your-shop"}</p>
           </div>
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" className={input} />
           <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password (min 6 characters)" type="password" className={input} />
         </div>
 
-        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+        {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
 
         <button disabled={loading} onClick={handleSignup}
-          className="mt-4 w-full rounded-xl bg-emerald-600 py-3 font-semibold text-white transition enabled:hover:bg-emerald-700 disabled:opacity-40">
+          className="mt-5 w-full rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 py-3 font-semibold text-white shadow-lg transition enabled:hover:from-amber-700 enabled:hover:to-amber-600 disabled:opacity-40">
           {loading ? "Creating…" : "Create my shop"}
         </button>
 
-        <p className="mt-3 text-center text-sm text-stone-500">
-          Already have a shop? <a href="/login" className="font-medium text-emerald-700 hover:underline">Log in</a>
+        <p className="mt-4 text-center text-sm text-stone-300">
+          Already have a shop? <a href="/login" className="font-medium text-amber-400 hover:underline">Log in</a>
         </p>
       </div>
     </div>

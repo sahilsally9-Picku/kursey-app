@@ -32,7 +32,7 @@ export default function Analytics() {
     init();
   }, [router]);
 
-  if (checking || loading) return <div className="flex min-h-screen items-center justify-center bg-stone-100 text-stone-500">Loading…</div>;
+  if (checking || loading) return <div className="flex min-h-screen items-center justify-center text-stone-300">Loading…</div>;
 
   // only real, non-cancelled bookings for revenue/counts
   const real = bookings.filter((b) => !b.is_block);
@@ -68,40 +68,40 @@ export default function Analytics() {
   const cancelRate = real.length ? Math.round((cancelled.length / real.length) * 100) : 0;
   const avgRating = reviews.length ? (reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length) : null;
 
-  const card = "rounded-2xl bg-white p-4 ring-1 ring-stone-200";
-  const barBg = "h-2.5 rounded-full bg-stone-100 overflow-hidden";
+  const card = "rounded-2xl bg-stone-900/75 ring-1 ring-white/15 backdrop-blur-md p-4";
+  const barBg = "h-2.5 rounded-full bg-white/10 overflow-hidden";
 
   return (
-    <div className="min-h-screen bg-stone-100 text-stone-900">
+    <div className="min-h-screen text-white">
       <div className="mx-auto max-w-2xl px-4 py-8">
         <div className="flex items-center justify-between">
-          <div><h1 className="text-2xl font-bold">Analytics</h1><p className="text-sm text-stone-500">{shop.name}</p></div>
-          <a href="/dashboard" className="text-sm font-medium text-emerald-700 hover:underline">← Dashboard</a>
+          <div><h1 className="font-display text-3xl font-bold tracking-tight">Analytics</h1><p className="text-sm text-stone-300">{shop.name}</p></div>
+          <a href="/dashboard" className="text-sm font-medium text-amber-400 hover:underline">← Dashboard</a>
         </div>
 
         {/* REVENUE */}
-        <h2 className="mt-6 mb-2 text-lg font-semibold">Revenue</h2>
+        <h2 className="mt-6 mb-2 font-display text-xl font-semibold">Revenue</h2>
         <div className="grid grid-cols-3 gap-3">
-          <div className={card}><div className="text-2xl font-bold text-emerald-700">${revWeek}</div><div className="text-xs text-stone-500">This week</div></div>
-          <div className={card}><div className="text-2xl font-bold text-emerald-700">${revMonth}</div><div className="text-xs text-stone-500">This month</div></div>
-          <div className={card}><div className="text-2xl font-bold text-emerald-700">${revAll}</div><div className="text-xs text-stone-500">All time</div></div>
+          <div className={card}><div className="text-2xl font-bold text-amber-400">${revWeek}</div><div className="text-xs text-stone-400">This week</div></div>
+          <div className={card}><div className="text-2xl font-bold text-amber-400">${revMonth}</div><div className="text-xs text-stone-400">This month</div></div>
+          <div className={card}><div className="text-2xl font-bold text-amber-400">${revAll}</div><div className="text-xs text-stone-400">All time</div></div>
         </div>
 
         {/* KEY NUMBERS */}
         <div className="mt-3 grid grid-cols-3 gap-3">
-          <div className={card}><div className="text-2xl font-bold">{active.length}</div><div className="text-xs text-stone-500">Completed / booked</div></div>
-          <div className={card}><div className="text-2xl font-bold text-red-600">{cancelRate}%</div><div className="text-xs text-stone-500">Cancellation rate</div></div>
-          <div className={card}><div className="text-2xl font-bold text-amber-500">{avgRating != null ? avgRating.toFixed(1) : "—"}</div><div className="text-xs text-stone-500">Avg rating ({reviews.length})</div></div>
+          <div className={card}><div className="text-2xl font-bold">{active.length}</div><div className="text-xs text-stone-400">Completed / booked</div></div>
+          <div className={card}><div className="text-2xl font-bold text-red-300">{cancelRate}%</div><div className="text-xs text-stone-400">Cancellation rate</div></div>
+          <div className={card}><div className="text-2xl font-bold text-amber-400">{avgRating != null ? avgRating.toFixed(1) : "—"}</div><div className="text-xs text-stone-400">Avg rating ({reviews.length})</div></div>
         </div>
 
         {/* BUSIEST DAYS */}
-        <h2 className="mt-6 mb-2 text-lg font-semibold">Busiest days</h2>
+        <h2 className="mt-6 mb-2 font-display text-xl font-semibold">Busiest days</h2>
         <div className={card}>
           <div className="space-y-2">
             {DOW.map((d, i) => (
               <div key={d} className="flex items-center gap-3">
-                <div className="w-10 text-sm text-stone-500">{d}</div>
-                <div className={`flex-1 ${barBg}`}><div className="h-full bg-emerald-500" style={{ width: `${(dayCounts[i] / maxDay) * 100}%` }} /></div>
+                <div className="w-10 text-sm text-stone-400">{d}</div>
+                <div className={`flex-1 ${barBg}`}><div className="h-full bg-amber-500" style={{ width: `${(dayCounts[i] / maxDay) * 100}%` }} /></div>
                 <div className="w-6 text-right text-sm font-medium">{dayCounts[i]}</div>
               </div>
             ))}
@@ -109,29 +109,29 @@ export default function Analytics() {
         </div>
 
         {/* BUSIEST HOURS */}
-        <h2 className="mt-6 mb-2 text-lg font-semibold">Busiest times</h2>
+        <h2 className="mt-6 mb-2 font-display text-xl font-semibold">Busiest times</h2>
         <div className={card}>
-          {hours.length === 0 ? <p className="text-sm text-stone-500">Not enough data yet.</p> : <div className="space-y-2">{hours.map((h) => (
+          {hours.length === 0 ? <p className="text-sm text-stone-400">Not enough data yet.</p> : <div className="space-y-2">{hours.map((h) => (
             <div key={h} className="flex items-center gap-3">
-              <div className="w-14 text-sm text-stone-500">{String(h).padStart(2, "0")}:00</div>
-              <div className={`flex-1 ${barBg}`}><div className="h-full bg-indigo-500" style={{ width: `${(hourCounts[h] / maxHour) * 100}%` }} /></div>
+              <div className="w-14 text-sm text-stone-400">{String(h).padStart(2, "0")}:00</div>
+              <div className={`flex-1 ${barBg}`}><div className="h-full bg-amber-600" style={{ width: `${(hourCounts[h] / maxHour) * 100}%` }} /></div>
               <div className="w-6 text-right text-sm font-medium">{hourCounts[h]}</div>
             </div>
           ))}</div>}
         </div>
 
         {/* PER-BARBER */}
-        <h2 className="mt-6 mb-2 text-lg font-semibold">Per barber</h2>
+        <h2 className="mt-6 mb-2 font-display text-xl font-semibold">Per barber</h2>
         <div className="space-y-2">
-          {barbers.length === 0 ? <p className={`${card} text-sm text-stone-500`}>No bookings yet.</p> : barbers.map(([name, st]) => (
+          {barbers.length === 0 ? <p className={`${card} text-sm text-stone-400`}>No bookings yet.</p> : barbers.map(([name, st]) => (
             <div key={name} className={`${card} flex items-center justify-between`}>
-              <div><div className="font-semibold">{name}</div><div className="text-sm text-stone-500">{st.count} booking{st.count === 1 ? "" : "s"}</div></div>
-              <div className="text-lg font-bold text-emerald-700">${st.rev}</div>
+              <div><div className="font-semibold">{name}</div><div className="text-sm text-stone-400">{st.count} booking{st.count === 1 ? "" : "s"}</div></div>
+              <div className="text-lg font-bold text-amber-400">${st.rev}</div>
             </div>
           ))}
         </div>
 
-        <p className="mt-6 text-center text-xs text-stone-400">Cancellations and blocked time are excluded from revenue.</p>
+        <p className="mt-6 text-center text-xs text-stone-500">Cancellations and blocked time are excluded from revenue.</p>
       </div>
     </div>
   );

@@ -26,7 +26,7 @@ function tightSlots(barber, service, bookings) {
   return out;
 }
 function Stars({ value, size = "text-base" }) {
-  return <span className={size}>{[1,2,3,4,5].map((n) => <span key={n} className={n <= Math.round(value) ? "text-amber-500" : "text-stone-300"}>★</span>)}</span>;
+  return <span className={size}>{[1,2,3,4,5].map((n) => <span key={n} className={n <= Math.round(value) ? "text-amber-400" : "text-white/25"}>★</span>)}</span>;
 }
 
 function DepositForm({ amount, onPaid, onCancel }) {
@@ -48,11 +48,11 @@ function DepositForm({ amount, onPaid, onCancel }) {
   }
 
   return (
-    <div>
+    <div className="rounded-xl bg-white p-4">
       <PaymentElement onReady={() => setReady(true)} />
       {!ready && <p className="mt-2 text-sm text-stone-400">Loading payment form…</p>}
       {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
-      <button onClick={pay} disabled={!stripe || !ready || paying} className="mt-4 w-full rounded-xl bg-emerald-600 py-3 font-semibold text-white transition enabled:hover:bg-emerald-700 disabled:opacity-40">
+      <button onClick={pay} disabled={!stripe || !ready || paying} className="mt-4 w-full rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 py-3 font-semibold text-white shadow transition enabled:hover:from-amber-700 enabled:hover:to-amber-600 disabled:opacity-40">
         {paying ? "Processing…" : `Pay $${amount} deposit`}
       </button>
       <button onClick={onCancel} className="mt-2 w-full text-sm text-stone-500">Cancel</button>
@@ -157,7 +157,9 @@ export default function ShopBooking() {
   const reset = () => { setStep("service"); setService(null); setBarber(null); setDate(null); setSlot(null); setDayBookings([]); if (!customer) { setName(""); setPhone(""); setEmail(""); } setOffers(false); setClientSecret(null); setStripeForAccount(null); };
   const dates = barber ? upcomingDates(barber) : [];
   const availableSlots = (barber && service && date) ? tightSlots(barber, service, dayBookings) : [];
-  const input = "w-full rounded-xl bg-white px-4 py-3 text-sm text-stone-900 outline-none ring-1 ring-stone-300 placeholder:text-stone-400 focus:ring-emerald-500";
+  const input = "w-full rounded-xl bg-white/95 px-4 py-3 text-sm text-stone-900 outline-none ring-1 ring-white/20 placeholder:text-stone-400 focus:ring-amber-500";
+  const btnPrimary = "rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 font-semibold text-white shadow-lg transition enabled:hover:from-amber-700 enabled:hover:to-amber-600 disabled:opacity-40";
+  const card = "rounded-2xl bg-white/10 ring-1 ring-white/15 backdrop-blur-md";
 
   async function saveBooking(depositPaid, paymentIntentId) {
     setSaving(true);
@@ -206,8 +208,8 @@ export default function ShopBooking() {
     }
   }
 
-  if (loading) return <div className="flex min-h-screen items-center justify-center bg-stone-100 text-stone-500">Loading…</div>;
-  if (notFound) return <div className="flex min-h-screen items-center justify-center bg-stone-100 px-4 text-center"><div><h1 className="text-2xl font-bold text-stone-800">Shop not found</h1><p className="mt-1 text-stone-500">No shop at kursey.com/{slug}.</p></div></div>;
+  if (loading) return <div className="flex min-h-screen items-center justify-center text-stone-300">Loading…</div>;
+  if (notFound) return <div className="flex min-h-screen items-center justify-center px-4 text-center"><div><h1 className="font-display text-2xl font-bold text-white">Shop not found</h1><p className="mt-1 text-stone-300">No shop at kursey.com/{slug}.</p></div></div>;
 
   if (shop) {
     const status = shop.subscription_status || "trialing";
@@ -216,11 +218,11 @@ export default function ShopBooking() {
     const inGoodStanding = status === "active" || trialValid;
     if (!inGoodStanding) {
       return (
-        <div className="flex min-h-screen items-center justify-center bg-stone-100 px-4 text-center">
-          <div className="max-w-sm">
-            <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full bg-stone-200 text-2xl">⏸️</div>
-            <h1 className="text-2xl font-bold text-stone-800">Booking temporarily unavailable</h1>
-            <p className="mt-2 text-stone-500">{shop.name} isn't taking online bookings right now. Please contact them directly{shop.phone ? ` at ${shop.phone}` : ""}.</p>
+        <div className="flex min-h-screen items-center justify-center px-4 text-center">
+          <div className="max-w-sm rounded-3xl bg-white/10 p-8 ring-1 ring-white/15 backdrop-blur-md">
+            <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full bg-white/15 text-2xl">⏸️</div>
+            <h1 className="font-display text-2xl font-bold text-white">Booking temporarily unavailable</h1>
+            <p className="mt-2 text-stone-300">{shop.name} isn't taking online bookings right now. Please contact them directly{shop.phone ? ` at ${shop.phone}` : ""}.</p>
           </div>
         </div>
       );
@@ -228,79 +230,79 @@ export default function ShopBooking() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-100 text-stone-900">
+    <div className="min-h-screen text-white">
       {lightbox && (<div onClick={() => setLightbox(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><img src={lightbox} alt="" className="max-h-[90vh] max-w-full rounded-xl" /></div>)}
       <div className="mx-auto max-w-lg px-4 py-8">
         <div className="mb-3 flex items-center justify-end gap-3 text-sm">
-          {customer ? (<><button onClick={openHistory} className="font-medium text-emerald-700 hover:underline">My bookings</button><button onClick={logoutCustomer} className="text-stone-500 hover:underline">Log out</button></>)
-          : (<button onClick={() => { setShowAuth(true); setAuthMode("login"); setResetSent(false); setAuthErr(""); }} className="font-medium text-emerald-700 hover:underline">Log in / Sign up</button>)}
+          {customer ? (<><button onClick={openHistory} className="font-medium text-amber-400 hover:underline">My bookings</button><button onClick={logoutCustomer} className="text-stone-300 hover:underline">Log out</button></>)
+          : (<button onClick={() => { setShowAuth(true); setAuthMode("login"); setResetSent(false); setAuthErr(""); }} className="font-medium text-amber-400 hover:underline">Log in / Sign up</button>)}
         </div>
 
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-stone-200">
-          <div className="h-24 bg-gradient-to-r from-emerald-800 to-stone-900" />
+        <div className={`overflow-hidden ${card}`}>
+          <div className="h-24 bg-gradient-to-br from-stone-900/80 via-stone-800/60 to-amber-800/50" />
           <div className="px-5 pb-5">
-            <div className="-mt-8 mb-2 grid h-16 w-16 place-items-center overflow-hidden rounded-2xl bg-emerald-600 text-2xl font-bold text-white shadow ring-4 ring-white">{shop.logo_url ? <img src={shop.logo_url} alt={shop.name} className="h-full w-full object-cover" /> : shop.name[0]}</div>
-            <h1 className="text-2xl font-bold">{shop.name}</h1>
-            {shop.description && <p className="mt-1 text-sm leading-relaxed text-stone-600">{shop.description}</p>}
-            <div className="mt-2 flex flex-col gap-1 text-sm text-stone-500">{shop.address && <div className="flex items-center gap-1.5"><span>📍</span>{shop.address}</div>}{shop.phone && <div className="flex items-center gap-1.5"><span>📞</span>{shop.phone}</div>}</div>
-            {!customer && <p className="mt-2 text-xs text-stone-400">Book in seconds — no app, no account needed.</p>}
-            {customer && <p className="mt-2 text-xs text-emerald-600">Welcome back, {customer.profile?.name || "friend"}!</p>}
+            <div className="-mt-8 mb-2 grid h-16 w-16 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-600 to-amber-800 text-2xl font-bold text-white shadow-lg ring-4 ring-white/20">{shop.logo_url ? <img src={shop.logo_url} alt={shop.name} className="h-full w-full object-cover" /> : shop.name[0]}</div>
+            <h1 className="font-display text-3xl font-bold tracking-tight">{shop.name}</h1>
+            {shop.description && <p className="mt-2 font-display text-sm italic leading-relaxed text-stone-200/90">{shop.description}</p>}
+            <div className="mt-3 flex flex-col gap-1 text-sm text-stone-300">{shop.address && <div className="flex items-center gap-1.5"><span>📍</span>{shop.address}</div>}{shop.phone && <div className="flex items-center gap-1.5"><span>📞</span>{shop.phone}</div>}</div>
+            {!customer && <p className="mt-3 text-xs uppercase tracking-[0.15em] text-amber-400/80">Book in seconds — no app needed</p>}
+            {customer && <p className="mt-3 text-xs text-amber-400">Welcome back, {customer.profile?.name || "friend"}!</p>}
           </div>
         </div>
 
         {showAuth && !customer && (
-          <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-emerald-300">
+          <div className={`mt-4 p-4 ${card}`}>
             {authMode === "forgot" ? (
               <>
-                <h3 className="mb-2 font-semibold">Reset password</h3>
+                <h3 className="mb-2 font-semibold text-white">Reset password</h3>
                 {resetSent ? (
-                  <p className="text-sm text-emerald-700">Check your email for a reset link. (It may take a minute, and could land in spam.)</p>
+                  <p className="text-sm text-amber-300">Check your email for a reset link. (It may take a minute, and could land in spam.)</p>
                 ) : (
                   <>
-                    <p className="mb-2 text-sm text-stone-500">Enter your email and we'll send a reset link.</p>
+                    <p className="mb-2 text-sm text-stone-300">Enter your email and we'll send a reset link.</p>
                     <input value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="Email" type="email" className={input} />
-                    {authErr && <p className="mt-2 text-sm text-red-600">{authErr}</p>}
-                    <button disabled={resetting || !authEmail} onClick={sendCustomerReset} className="mt-3 w-full rounded-xl bg-emerald-600 py-2.5 font-semibold text-white disabled:opacity-40">{resetting ? "Sending…" : "Send reset link"}</button>
+                    {authErr && <p className="mt-2 text-sm text-red-300">{authErr}</p>}
+                    <button disabled={resetting || !authEmail} onClick={sendCustomerReset} className={`mt-3 w-full py-2.5 ${btnPrimary}`}>{resetting ? "Sending…" : "Send reset link"}</button>
                   </>
                 )}
-                <button onClick={() => { setAuthMode("login"); setResetSent(false); setAuthErr(""); }} className="mt-3 block w-full text-center text-sm text-stone-500 hover:underline">← Back to login</button>
+                <button onClick={() => { setAuthMode("login"); setResetSent(false); setAuthErr(""); }} className="mt-3 block w-full text-center text-sm text-stone-300 hover:underline">← Back to login</button>
               </>
             ) : (
               <>
-                <div className="mb-3 flex gap-2"><button onClick={() => setAuthMode("login")} className={`flex-1 rounded-lg py-2 text-sm font-medium ${authMode === "login" ? "bg-emerald-600 text-white" : "bg-stone-100 text-stone-600"}`}>Log in</button><button onClick={() => setAuthMode("signup")} className={`flex-1 rounded-lg py-2 text-sm font-medium ${authMode === "signup" ? "bg-emerald-600 text-white" : "bg-stone-100 text-stone-600"}`}>Sign up</button></div>
+                <div className="mb-3 flex gap-2"><button onClick={() => setAuthMode("login")} className={`flex-1 rounded-lg py-2 text-sm font-medium ${authMode === "login" ? "bg-amber-600 text-white" : "bg-white/10 text-stone-200"}`}>Log in</button><button onClick={() => setAuthMode("signup")} className={`flex-1 rounded-lg py-2 text-sm font-medium ${authMode === "signup" ? "bg-amber-600 text-white" : "bg-white/10 text-stone-200"}`}>Sign up</button></div>
                 <div className="space-y-2">{authMode === "signup" && <><input value={authName} onChange={(e) => setAuthName(e.target.value)} placeholder="Your name" className={input} /><input value={authPhone} onChange={(e) => setAuthPhone(e.target.value)} placeholder="Mobile number" className={input} /></>}<input value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="Email" type="email" className={input} /><input value={authPass} onChange={(e) => setAuthPass(e.target.value)} placeholder="Password (min 6)" type="password" className={input} /></div>
-                {authErr && <p className="mt-2 text-sm text-red-600">{authErr}</p>}
-                <div className="mt-3 flex gap-2"><button disabled={authBusy || !authEmail || !authPass} onClick={handleAuth} className="flex-1 rounded-xl bg-emerald-600 py-2.5 font-semibold text-white disabled:opacity-40">{authBusy ? "…" : authMode === "signup" ? "Create account" : "Log in"}</button><button onClick={() => setShowAuth(false)} className="rounded-xl bg-stone-200 px-4 py-2.5 text-sm font-medium text-stone-700">Cancel</button></div>
-                {authMode === "login" && <button onClick={() => { setAuthMode("forgot"); setResetSent(false); setAuthErr(""); }} className="mt-2 block w-full text-center text-sm text-emerald-700 hover:underline">Forgot password?</button>}
+                {authErr && <p className="mt-2 text-sm text-red-300">{authErr}</p>}
+                <div className="mt-3 flex gap-2"><button disabled={authBusy || !authEmail || !authPass} onClick={handleAuth} className={`flex-1 py-2.5 ${btnPrimary}`}>{authBusy ? "…" : authMode === "signup" ? "Create account" : "Log in"}</button><button onClick={() => setShowAuth(false)} className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-medium text-stone-200">Cancel</button></div>
+                {authMode === "login" && <button onClick={() => { setAuthMode("forgot"); setResetSent(false); setAuthErr(""); }} className="mt-2 block w-full text-center text-sm text-amber-400 hover:underline">Forgot password?</button>}
               </>
             )}
           </div>
         )}
 
         {showHistory && customer && (
-          <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-stone-200">
-            <div className="flex items-center justify-between"><h2 className="font-semibold">Your bookings</h2><button onClick={() => setShowHistory(false)} className="text-sm text-stone-500">Close</button></div>
-            {history.length === 0 ? <p className="mt-2 text-sm text-stone-500">No bookings yet.</p> : <div className="mt-2 space-y-2">{history.map((b) => {
+          <div className={`mt-4 p-4 ${card}`}>
+            <div className="flex items-center justify-between"><h2 className="font-display text-lg font-semibold">Your bookings</h2><button onClick={() => setShowHistory(false)} className="text-sm text-stone-300">Close</button></div>
+            {history.length === 0 ? <p className="mt-2 text-sm text-stone-300">No bookings yet.</p> : <div className="mt-2 space-y-2">{history.map((b) => {
               const isCancelled = b.status === "cancelled";
               const isUpcoming = b.booking_date && b.booking_date >= new Date().toISOString().slice(0, 10);
               const isPast = b.booking_date && b.booking_date < new Date().toISOString().slice(0, 10);
               return (
-                <div key={b.id} className={`rounded-xl p-3 text-sm ring-1 ${isCancelled ? "bg-stone-100 ring-stone-200 opacity-60" : "bg-stone-50 ring-stone-200"}`}>
+                <div key={b.id} className={`rounded-xl p-3 text-sm ring-1 ${isCancelled ? "bg-white/5 ring-white/10 opacity-60" : "bg-white/5 ring-white/10"}`}>
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="font-medium">{b.service} with {b.barber}</div>
-                      <div className="text-stone-500">{b.day} at {b.slot} · ${b.price}</div>
-                      {isCancelled && <div className="mt-1 text-xs font-medium text-red-600">Cancelled</div>}
+                      <div className="text-stone-300">{b.day} at {b.slot} · ${b.price}</div>
+                      {isCancelled && <div className="mt-1 text-xs font-medium text-red-300">Cancelled</div>}
                     </div>
-                    {!isCancelled && isUpcoming && (<button onClick={() => cancelBooking(b.id)} className="shrink-0 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 ring-1 ring-red-200 hover:bg-red-100">Cancel</button>)}
+                    {!isCancelled && isUpcoming && (<button onClick={() => cancelBooking(b.id)} className="shrink-0 rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-medium text-red-200 ring-1 ring-red-400/30 hover:bg-red-500/30">Cancel</button>)}
                   </div>
-                  {!isCancelled && isPast && !b.reviewed && reviewFor !== b.id && (<button onClick={() => { setReviewFor(b.id); setRStars(5); setRComment(""); }} className="mt-2 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200 hover:bg-amber-100">Leave a review</button>)}
-                  {b.reviewed && <div className="mt-2 text-xs font-medium text-emerald-600">✓ Reviewed</div>}
+                  {!isCancelled && isPast && !b.reviewed && reviewFor !== b.id && (<button onClick={() => { setReviewFor(b.id); setRStars(5); setRComment(""); }} className="mt-2 rounded-lg bg-amber-500/20 px-3 py-1.5 text-xs font-medium text-amber-200 ring-1 ring-amber-400/30 hover:bg-amber-500/30">Leave a review</button>)}
+                  {b.reviewed && <div className="mt-2 text-xs font-medium text-amber-400">✓ Reviewed</div>}
                   {reviewFor === b.id && (
-                    <div className="mt-2 rounded-lg bg-white p-3 ring-1 ring-amber-200">
-                      <div className="mb-2 flex gap-1">{[1,2,3,4,5].map((n) => (<button key={n} onClick={() => setRStars(n)} className={`text-2xl ${n <= rStars ? "text-amber-500" : "text-stone-300"}`}>★</button>))}</div>
+                    <div className="mt-2 rounded-lg bg-white/10 p-3 ring-1 ring-white/15">
+                      <div className="mb-2 flex gap-1">{[1,2,3,4,5].map((n) => (<button key={n} onClick={() => setRStars(n)} className={`text-2xl ${n <= rStars ? "text-amber-400" : "text-white/25"}`}>★</button>))}</div>
                       <textarea value={rComment} onChange={(e) => setRComment(e.target.value)} placeholder="How was your visit? (optional)" rows={3} className={`${input} resize-none`} />
-                      <div className="mt-2 flex gap-2"><button onClick={() => submitReview(b)} disabled={savingReview} className="flex-1 rounded-lg bg-emerald-600 py-2 text-sm font-semibold text-white disabled:opacity-40">{savingReview ? "Saving…" : "Submit review"}</button><button onClick={() => setReviewFor(null)} className="rounded-lg bg-stone-200 px-3 py-2 text-sm font-medium text-stone-700">Cancel</button></div>
+                      <div className="mt-2 flex gap-2"><button onClick={() => submitReview(b)} disabled={savingReview} className={`flex-1 py-2 text-sm ${btnPrimary}`}>{savingReview ? "Saving…" : "Submit review"}</button><button onClick={() => setReviewFor(null)} className="rounded-lg bg-white/10 px-3 py-2 text-sm font-medium text-stone-200">Cancel</button></div>
                     </div>
                   )}
                 </div>
@@ -309,38 +311,38 @@ export default function ShopBooking() {
           </div>
         )}
 
-        {step === "service" && (<><h2 className="mt-6 mb-3 text-lg font-semibold">Choose a service</h2>{services.length === 0 ? <p className="rounded-xl bg-white p-4 text-stone-500 ring-1 ring-stone-200">This shop hasn't added services yet.</p> : <div className="space-y-2">{services.map((s) => (<button key={s.id} onClick={() => { setService(s); setStep("barber"); }} className="flex w-full items-start justify-between rounded-xl bg-white p-4 text-left ring-1 ring-stone-200 transition hover:ring-emerald-400"><div className="pr-3"><div className="font-medium">{s.name}</div><div className="text-sm text-stone-500">{s.mins} min</div>{s.description && <div className="mt-1 text-sm text-stone-400">{s.description}</div>}</div><div className="shrink-0 text-lg font-semibold">${s.price}</div></button>))}</div>}</>)}
+        {step === "service" && (<><h2 className="mt-6 mb-3 font-display text-xl font-semibold">Choose a service</h2>{services.length === 0 ? <p className={`p-4 text-stone-300 ${card}`}>This shop hasn't added services yet.</p> : <div className="space-y-2">{services.map((s) => (<button key={s.id} onClick={() => { setService(s); setStep("barber"); }} className={`flex w-full items-start justify-between p-4 text-left transition hover:ring-amber-400/60 ${card}`}><div className="pr-3"><div className="text-base font-semibold">{s.name}</div><div className="text-sm text-stone-300">{s.mins} min</div>{s.description && <div className="mt-1 font-display text-sm italic text-stone-400">{s.description}</div>}</div><div className="shrink-0 font-display text-xl font-bold text-amber-400">${s.price}</div></button>))}</div>}</>)}
 
-        {step === "barber" && (<><button onClick={() => setStep("service")} className="mt-6 text-sm font-medium text-stone-500">← Back</button><h2 className="mt-2 mb-1 text-lg font-semibold">Pick your barber</h2>{staff.length === 0 ? <p className="mt-3 rounded-xl bg-white p-4 text-stone-500 ring-1 ring-stone-200">This shop hasn't added barbers yet.</p> : <div className="space-y-3">{staff.map((b) => {
+        {step === "barber" && (<><button onClick={() => setStep("service")} className="mt-6 text-sm font-medium text-stone-300">← Back</button><h2 className="mt-2 mb-1 font-display text-xl font-semibold">Pick your barber</h2>{staff.length === 0 ? <p className={`mt-3 p-4 text-stone-300 ${card}`}>This shop hasn't added barbers yet.</p> : <div className="space-y-3">{staff.map((b) => {
           const avg = avgRating(b.name); const brevs = reviewsFor(b.name);
           return (
-            <div key={b.id} className="rounded-2xl bg-white p-4 ring-1 ring-stone-200">
+            <div key={b.id} className={`p-4 ${card}`}>
               <div className="flex items-start gap-3">
-                <div className={`grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl ${b.color || "bg-emerald-700"} text-xl font-semibold text-white`}>{b.photo_url ? <img src={b.photo_url} alt={b.name} className="h-full w-full object-cover" /> : b.name[0]}</div>
+                <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-600 to-amber-800 text-xl font-semibold text-white">{b.photo_url ? <img src={b.photo_url} alt={b.name} className="h-full w-full object-cover" /> : b.name[0]}</div>
                 <div className="flex-1">
-                  <div className="font-semibold">{b.name}</div>
-                  {b.specialty && <span className="mt-0.5 inline-block rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">{b.specialty}</span>}
-                  {avg != null && <div className="mt-1 flex items-center gap-1.5"><Stars value={avg} size="text-sm" /><span className="text-xs text-stone-500">{avg.toFixed(1)} ({brevs.length})</span></div>}
-                  {b.bio && <p className="mt-1.5 text-sm leading-relaxed text-stone-500">{b.bio}</p>}
+                  <div className="font-display text-lg font-semibold">{b.name}</div>
+                  {b.specialty && <span className="mt-0.5 inline-block rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-200">{b.specialty}</span>}
+                  {avg != null && <div className="mt-1 flex items-center gap-1.5"><Stars value={avg} size="text-sm" /><span className="text-xs text-stone-300">{avg.toFixed(1)} ({brevs.length})</span></div>}
+                  {b.bio && <p className="mt-1.5 font-display text-sm italic leading-relaxed text-stone-300">{b.bio}</p>}
                 </div>
               </div>
-              {(b.work_photos || []).length > 0 && (<div className="mt-3"><div className="mb-1 text-xs font-medium text-stone-400">Their work</div><div className="flex gap-2 overflow-x-auto pb-1">{b.work_photos.map((url, i) => (<img key={i} src={url} alt="work" onClick={() => setLightbox(url)} className="h-20 w-20 shrink-0 cursor-pointer rounded-lg object-cover ring-1 ring-stone-200" />))}</div></div>)}
-              {brevs.length > 0 && (<div className="mt-3 border-t border-stone-100 pt-3"><div className="mb-1 text-xs font-medium text-stone-400">Reviews</div><div className="space-y-2">{brevs.slice(0, 3).map((r) => (<div key={r.id} className="rounded-lg bg-stone-50 p-2 ring-1 ring-stone-200"><div className="flex items-center justify-between"><span className="text-xs font-medium text-stone-700">{r.customer_name}</span><Stars value={r.rating} size="text-xs" /></div>{r.comment && <p className="mt-0.5 text-xs text-stone-500">{r.comment}</p>}{r.owner_reply && <div className="mt-1 rounded bg-emerald-50 p-1.5 text-xs text-emerald-800"><span className="font-semibold">{shop.name}:</span> {r.owner_reply}</div>}</div>))}</div></div>)}
-              <button onClick={() => { setBarber(b); setDate(null); setSlot(null); setStep("time"); }} className="mt-3 w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">Book with {b.name}</button>
+              {(b.work_photos || []).length > 0 && (<div className="mt-3"><div className="mb-1 text-xs font-medium uppercase tracking-wide text-stone-400">Their work</div><div className="flex gap-2 overflow-x-auto pb-1">{b.work_photos.map((url, i) => (<img key={i} src={url} alt="work" onClick={() => setLightbox(url)} className="h-20 w-20 shrink-0 cursor-pointer rounded-xl object-cover ring-1 ring-white/15" />))}</div></div>)}
+              {brevs.length > 0 && (<div className="mt-3 border-t border-white/10 pt-3"><div className="mb-1 text-xs font-medium uppercase tracking-wide text-stone-400">Reviews</div><div className="space-y-2">{brevs.slice(0, 3).map((r) => (<div key={r.id} className="rounded-lg bg-white/5 p-2 ring-1 ring-white/10"><div className="flex items-center justify-between"><span className="text-xs font-medium text-stone-200">{r.customer_name}</span><Stars value={r.rating} size="text-xs" /></div>{r.comment && <p className="mt-0.5 text-xs italic text-stone-300">{r.comment}</p>}{r.owner_reply && <div className="mt-1 rounded bg-amber-500/15 p-1.5 text-xs text-amber-100"><span className="font-semibold not-italic">{shop.name}:</span> <span className="italic">{r.owner_reply}</span></div>}</div>))}</div></div>)}
+              <button onClick={() => { setBarber(b); setDate(null); setSlot(null); setStep("time"); }} className={`mt-4 w-full py-2.5 text-sm ${btnPrimary}`}>Book with {b.name}</button>
             </div>
           );
         })}</div>}</>)}
 
-        {step === "time" && (<><button onClick={() => { setStep("barber"); setDate(null); setSlot(null); }} className="mt-6 text-sm font-medium text-stone-500">← Back</button><h2 className="mt-2 mb-1 text-lg font-semibold">Pick a day &amp; time with {barber.name}</h2><p className="mb-3 text-sm text-stone-500">{service.name} · {service.mins} min</p>{dates.length === 0 ? <p className="mt-3 rounded-xl bg-white p-4 text-stone-500 ring-1 ring-stone-200">No working days set for this barber.</p> : <><div className="mb-3 flex gap-2 overflow-x-auto pb-1">{dates.map((d) => (<button key={d.key} onClick={() => { setDate(d); setSlot(null); }} className={`min-w-[68px] shrink-0 rounded-xl px-2 py-2 text-center ring-1 transition ${date?.key === d.key ? "bg-emerald-600 text-white ring-emerald-600" : "bg-white text-stone-700 ring-stone-200"}`}><div className="text-sm font-semibold">{d.label}</div><div className={`text-xs ${date?.key === d.key ? "text-emerald-100" : "text-stone-400"}`}>{d.sub}</div></button>))}</div>{!date ? <p className="text-sm text-stone-400">Pick a day above.</p> : loadingSlots ? <p className="text-sm text-stone-400">Checking…</p> : availableSlots.length === 0 ? <p className="rounded-xl bg-white p-4 text-stone-500 ring-1 ring-stone-200">Fully booked — try another day.</p> : <div className="grid grid-cols-3 gap-2">{availableSlots.map((m) => (<button key={m} onClick={() => setSlot(m)} className={`rounded-xl py-2.5 text-sm font-medium ring-1 transition ${slot === m ? "bg-emerald-600 text-white ring-emerald-600" : "bg-white text-stone-800 ring-stone-200 hover:ring-emerald-400"}`}>{toLabel(m)}</button>))}</div>}</>}<button disabled={slot === null || !date} onClick={() => setStep("details")} className="mt-4 w-full rounded-xl bg-emerald-600 py-3 font-semibold text-white transition enabled:hover:bg-emerald-700 disabled:opacity-40">Continue</button></>)}
+        {step === "time" && (<><button onClick={() => { setStep("barber"); setDate(null); setSlot(null); }} className="mt-6 text-sm font-medium text-stone-300">← Back</button><h2 className="mt-2 mb-1 font-display text-xl font-semibold">Pick a day &amp; time with {barber.name}</h2><p className="mb-3 text-sm text-stone-300">{service.name} · {service.mins} min</p>{dates.length === 0 ? <p className={`mt-3 p-4 text-stone-300 ${card}`}>No working days set for this barber.</p> : <><div className="mb-3 flex gap-2 overflow-x-auto pb-1">{dates.map((d) => (<button key={d.key} onClick={() => { setDate(d); setSlot(null); }} className={`min-w-[68px] shrink-0 rounded-xl px-2 py-2.5 text-center ring-1 transition ${date?.key === d.key ? "bg-amber-600 text-white ring-amber-500" : "bg-white/10 text-stone-200 ring-white/15"}`}><div className="text-sm font-semibold">{d.label}</div><div className={`text-xs ${date?.key === d.key ? "text-amber-100" : "text-stone-400"}`}>{d.sub}</div></button>))}</div>{!date ? <p className="text-sm text-stone-400">Pick a day above.</p> : loadingSlots ? <p className="text-sm text-stone-400">Checking…</p> : availableSlots.length === 0 ? <p className={`p-4 text-stone-300 ${card}`}>Fully booked — try another day.</p> : <div className="grid grid-cols-3 gap-2">{availableSlots.map((m) => (<button key={m} onClick={() => setSlot(m)} className={`rounded-xl py-2.5 text-sm font-medium ring-1 transition ${slot === m ? "bg-amber-600 text-white ring-amber-500" : "bg-white/10 text-stone-100 ring-white/15 hover:ring-amber-400/60"}`}>{toLabel(m)}</button>))}</div>}</>}<button disabled={slot === null || !date} onClick={() => setStep("details")} className={`mt-4 w-full py-3 ${btnPrimary}`}>Continue</button></>)}
 
-        {step === "details" && (<><button onClick={() => setStep("time")} className="mt-6 text-sm font-medium text-stone-500">← Back</button><h2 className="mt-2 mb-3 text-lg font-semibold">Your details</h2><div className="rounded-2xl bg-white p-4 ring-1 ring-stone-200"><div className="flex justify-between text-sm"><span className="text-stone-400">Service</span><span className="font-medium">{service.name} · ${service.price}</span></div><div className="mt-1 flex justify-between text-sm"><span className="text-stone-400">Barber</span><span className="font-medium">{barber.name}</span></div><div className="mt-1 flex justify-between text-sm"><span className="text-stone-400">When</span><span className="font-medium">{date.label} {date.sub} at {toLabel(slot)}</span></div>{shop.deposits_enabled && shop.stripe_account_id && <div className="mt-1 flex justify-between text-sm"><span className="text-stone-400">Deposit</span><span className="font-medium text-emerald-700">${shop.deposit_amount} to confirm</span></div>}</div><div className="mt-3 space-y-2"><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className={input} /><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Mobile number" className={input} /><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (for your confirmation)" className={input} /></div><button onClick={() => setOffers(!offers)} className="mt-2 flex w-full items-start gap-2 rounded-xl bg-white p-3 text-left text-sm ring-1 ring-stone-200"><span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded border text-white ${offers ? "border-emerald-600 bg-emerald-600" : "border-stone-300"}`}>{offers ? "✓" : ""}</span><span className="text-stone-600">Email me offers &amp; news <span className="text-stone-400">— optional</span></span></button><button disabled={!name || !phone || saving || preparingPayment} onClick={handleConfirm} className="mt-3 w-full rounded-xl bg-emerald-600 py-3 font-semibold text-white transition enabled:hover:bg-emerald-700 disabled:opacity-40">{preparingPayment ? "Preparing…" : saving ? "Booking…" : shop.deposits_enabled && shop.stripe_account_id ? `Continue to deposit ($${shop.deposit_amount})` : "Confirm booking"}</button></>)}
+        {step === "details" && (<><button onClick={() => setStep("time")} className="mt-6 text-sm font-medium text-stone-300">← Back</button><h2 className="mt-2 mb-3 font-display text-xl font-semibold">Your details</h2><div className={`p-4 ${card}`}><div className="flex justify-between text-sm"><span className="text-stone-400">Service</span><span className="font-medium">{service.name} · ${service.price}</span></div><div className="mt-1 flex justify-between text-sm"><span className="text-stone-400">Barber</span><span className="font-medium">{barber.name}</span></div><div className="mt-1 flex justify-between text-sm"><span className="text-stone-400">When</span><span className="font-medium">{date.label} {date.sub} at {toLabel(slot)}</span></div>{shop.deposits_enabled && shop.stripe_account_id && <div className="mt-1 flex justify-between text-sm"><span className="text-stone-400">Deposit</span><span className="font-medium text-amber-400">${shop.deposit_amount} to confirm</span></div>}</div><div className="mt-3 space-y-2"><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className={input} /><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Mobile number" className={input} /><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (for your confirmation)" className={input} /></div><button onClick={() => setOffers(!offers)} className={`mt-2 flex w-full items-start gap-2 p-3 text-left text-sm ${card}`}><span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded border text-white ${offers ? "border-amber-500 bg-amber-600" : "border-white/30"}`}>{offers ? "✓" : ""}</span><span className="text-stone-200">Email me offers &amp; news <span className="text-stone-400">— optional</span></span></button><button disabled={!name || !phone || saving || preparingPayment} onClick={handleConfirm} className={`mt-3 w-full py-3 ${btnPrimary}`}>{preparingPayment ? "Preparing…" : saving ? "Booking…" : shop.deposits_enabled && shop.stripe_account_id ? `Continue to deposit ($${shop.deposit_amount})` : "Confirm booking"}</button></>)}
 
         {step === "pay" && clientSecret && stripeForAccount && (
           <>
-            <button onClick={() => { setStep("details"); setClientSecret(null); setStripeForAccount(null); }} className="mt-6 text-sm font-medium text-stone-500">← Back</button>
-            <h2 className="mt-2 mb-3 text-lg font-semibold">Pay your deposit</h2>
-            <div className="rounded-2xl bg-white p-4 ring-1 ring-stone-200">
-              <p className="mb-3 text-sm text-stone-500">A ${shop.deposit_amount} deposit confirms your booking with {barber.name}.</p>
+            <button onClick={() => { setStep("details"); setClientSecret(null); setStripeForAccount(null); }} className="mt-6 text-sm font-medium text-stone-300">← Back</button>
+            <h2 className="mt-2 mb-3 font-display text-xl font-semibold">Pay your deposit</h2>
+            <div className={`p-4 ${card}`}>
+              <p className="mb-3 text-sm text-stone-300">A ${shop.deposit_amount} deposit confirms your booking with {barber.name}.</p>
               <Elements stripe={stripeForAccount} options={{ clientSecret }}>
                 <DepositForm amount={shop.deposit_amount} onPaid={async (paymentIntentId) => { const ok = await saveBooking(true, paymentIntentId); if (ok) setStep("done"); }} onCancel={() => { setStep("details"); setClientSecret(null); setStripeForAccount(null); }} />
               </Elements>
@@ -348,7 +350,7 @@ export default function ShopBooking() {
           </>
         )}
 
-        {step === "done" && (<div className="mt-6 rounded-2xl bg-white p-6 text-center ring-1 ring-stone-200"><div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full bg-emerald-100 text-2xl text-emerald-700">✓</div><h2 className="text-xl font-bold">You&apos;re booked, {name}!</h2><p className="mt-1 text-stone-600"><span className="font-semibold">{service.name}</span> with <span className="font-semibold">{barber.name}</span></p><p className="mt-1 text-stone-600">{date.label} {date.sub} at {toLabel(slot)}</p>{shop.deposits_enabled && shop.stripe_account_id && <p className="mt-1 text-sm text-emerald-700">Deposit of ${shop.deposit_amount} paid ✓</p>}{email && <p className="mt-2 text-sm text-stone-400">A confirmation has been sent to {email}.</p>}<button onClick={reset} className="mt-4 block w-full text-sm font-medium text-emerald-700 underline">Book another</button></div>)}
+        {step === "done" && (<div className={`mt-6 p-6 text-center ${card}`}><div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-amber-500 to-amber-700 text-2xl text-white shadow-lg">✓</div><h2 className="font-display text-2xl font-bold">You&apos;re booked, {name}!</h2><p className="mt-1 text-stone-200"><span className="font-semibold">{service.name}</span> with <span className="font-semibold">{barber.name}</span></p><p className="mt-1 text-stone-200">{date.label} {date.sub} at {toLabel(slot)}</p>{shop.deposits_enabled && shop.stripe_account_id && <p className="mt-1 text-sm text-amber-400">Deposit of ${shop.deposit_amount} paid ✓</p>}{email && <p className="mt-2 text-sm text-stone-400">A confirmation has been sent to {email}.</p>}<button onClick={reset} className="mt-4 block w-full text-sm font-medium text-amber-400 underline">Book another</button></div>)}
       </div>
     </div>
   );
