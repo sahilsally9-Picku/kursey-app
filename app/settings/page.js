@@ -38,7 +38,7 @@ function SettingsInner() {
   const [stBio, setStBio] = useState(""); const [stPhoto, setStPhoto] = useState(""); const [stWork, setStWork] = useState([]);
   const [stColor, setStColor] = useState("bg-emerald-700");
   const [stDays, setStDays] = useState(["Mon", "Tue", "Wed", "Thu", "Fri"]);
-  const [stStart, setStStart] = useState("09:00"); const [stEnd, setStEnd] = useState("17:00");
+  const [stDayHours, setStDayHours] = useState({ Mon: ["09:00", "17:00"], Tue: ["09:00", "17:00"], Wed: ["09:00", "17:00"], Thu: ["09:00", "17:00"], Fri: ["09:00", "17:00"] });
   const [stBreaks, setStBreaks] = useState([]); const [brStart, setBrStart] = useState("13:00"); const [brEnd, setBrEnd] = useState("14:00");
   const [editStaffId, setEditStaffId] = useState(null);
 
@@ -121,14 +121,36 @@ function SettingsInner() {
   }
   async function deleteService(id) { await supabase.from("services").delete().eq("id", id); if (editServiceId === id) resetServiceForm(); loadServices(shop.id); }
 
-  function resetStaffForm() { setStName(""); setStSpecialty(""); setStBio(""); setStPhoto(""); setStWork([]); setStColor("bg-emerald-700"); setStDays(["Mon", "Tue", "Wed", "Thu", "Fri"]); setStStart("09:00"); setStEnd("17:00"); setStBreaks([]); setBrStart("13:00"); setBrEnd("14:00"); setEditStaffId(null); }
-  function startEditStaff(st) { setEditStaffId(st.id); setStName(st.name); setStSpecialty(st.specialty || ""); setStBio(st.bio || ""); setStPhoto(st.photo_url || ""); setStWork(st.work_photos || []); setStColor(st.color || "bg-emerald-700"); setStDays(st.work_days || []); setStStart(st.start_time || "09:00"); setStEnd(st.end_time || "17:00"); setStBreaks(st.breaks || []); window.scrollTo({ top: 0, behavior: "smooth" }); }
-  function toggleDay(day) { setStDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]); }
+  function resetStaffForm() { setStName(""); setStSpecialty(""); setStBio(""); setStPhoto(""); setStWork([]); setStColor("bg-emerald-700"); setStDays(["Mon", "Tue", "Wed", "Thu", "Fri"]); setStDayHours({ Mon: ["09:00", "17:00"], Tue: ["09:00", "17:00"], Wed: ["09:00", "17:00"], Thu: ["09:00", "17:00"], Fri: ["09:00", "17:00"] }); setStBreaks([]); setBrStart("13:00"); setBrEnd("14:00"); setEditStaffId(null); }
+  function startEditStaff(st) {
+    setEditStaffId(st.id); setStName(st.name); setStSpecialty(st.specialty || ""); setStBio(st.bio || ""); setStPhoto(st.photo_url || ""); setStWork(st.work_photos || []); setStColor(st.color || "bg-emerald-700");
+    const days = st.work_days || [];
+    setStDays(days);
+    const dh = {};
+    days.forEach((d) => { dh[d] = (st.day_hours && st.day_hours[d]) ? st.day_hours[d] : [st.start_time || "09:00", st.end_time || "17:00"]; });
+    setStDayHours(dh);
+    setStBreaks(st.breaks || []);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function toggleDay(day) {
+    setStDays((prev) => {
+      if (prev.includes(day)) { setStDayHours((h) => { const n = { ...h }; delete n[day]; return n; }); return prev.filter((d) => d !== day); }
+      setStDayHours((h) => ({ ...h, [day]: h[day] || ["09:00", "17:00"] }));
+      return [...prev, day];
+    });
+  }
+  function setDayHour(day, idx, value) {
+    setStDayHours((h) => { const pair = h[day] || ["09:00", "17:00"]; const np = [...pair]; np[idx] = value; return { ...h, [day]: np }; });
+  }
   function addBreakToForm() { if (brStart >= brEnd) { alert("Break end must be after start."); return; } setStBreaks((prev) => [...prev, `${brStart}-${brEnd}`]); }
   function removeBreakFromForm(i) { setStBreaks((prev) => prev.filter((_, idx) => idx !== i)); }
   async function saveStaff() {
     if (!stName || stDays.length === 0) { alert("Add a name and at least one working day."); return; }
-    const payload = { name: stName, specialty: stSpecialty, bio: stBio, photo_url: stPhoto || null, work_photos: stWork, color: stColor, work_days: stDays, start_time: stStart, end_time: stEnd, breaks: stBreaks, shop_id: shop.id };
+    const starts = stDays.map((d) => (stDayHours[d] || ["09:00", "17:00"])[0]).sort();
+    const ends = stDays.map((d) => (stDayHours[d] || ["09:00", "17:00"])[1]).sort();
+    const minStart = starts[0] || "09:00";
+    const maxEnd = ends[ends.length - 1] || "17:00";
+    const payload = { name: stName, specialty: stSpecialty, bio: stBio, photo_url: stPhoto || null, work_photos: stWork, color: stColor, work_days: stDays, day_hours: stDayHours, start_time: minStart, end_time: maxEnd, breaks: stBreaks, shop_id: shop.id };
     const { error } = editStaffId ? await supabase.from("staff").update(payload).eq("id", editStaffId) : await supabase.from("staff").insert(payload);
     if (error) { alert("Error: " + error.message); return; }
     resetStaffForm(); loadStaff(shop.id);
@@ -223,9 +245,25 @@ function SettingsInner() {
             <input value={stSpecialty} onChange={(e) => setStSpecialty(e.target.value)} placeholder="Specialty" className={input} />
             <textarea value={stBio} onChange={(e) => setStBio(e.target.value)} placeholder="About this barber" rows={3} className={`${input} resize-none`} />
             <div className="pt-1"><div className="mb-1 text-xs font-medium text-stone-300">Work photos</div><div className="flex flex-wrap gap-2">{stWork.map((url, i) => (<div key={i} className="relative h-16 w-16 overflow-hidden rounded-lg ring-1 ring-white/15"><img src={url} alt="" className="h-full w-full object-cover" /><button onClick={() => removeWorkPhoto(i)} className="absolute right-0 top-0 grid h-5 w-5 place-items-center rounded-bl-lg bg-black/60 text-xs text-white">✕</button></div>))}<label className="grid h-16 w-16 cursor-pointer place-items-center rounded-lg bg-white/5 text-2xl text-stone-400 ring-1 ring-dashed ring-white/25 hover:bg-white/10">{uploadingWork ? "…" : "+"}<input type="file" accept="image/*" className="hidden" onChange={(e) => uploadWorkPhoto(e.target.files[0])} disabled={uploadingWork} /></label></div></div>
-            <div className="pt-1"><div className="mb-1 text-xs font-medium text-stone-300">Working days</div><div className="flex flex-wrap gap-1.5">{DAYS.map((d) => (<button key={d} onClick={() => toggleDay(d)} className={`rounded-lg px-3 py-1.5 text-sm ring-1 transition ${stDays.includes(d) ? "bg-amber-600 text-white ring-amber-500" : "bg-white/10 text-stone-200 ring-white/20"}`}>{d}</button>))}</div></div>
-            <div className="flex items-center gap-2 pt-1"><div className="flex-1"><div className="mb-1 text-xs font-medium text-stone-300">Start</div><select value={stStart} onChange={(e) => setStStart(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div><div className="flex-1"><div className="mb-1 text-xs font-medium text-stone-300">End</div><select value={stEnd} onChange={(e) => setStEnd(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div></div>
-            <div className="pt-1"><div className="mb-1 text-xs font-medium text-stone-300">Breaks (optional)</div><div className="flex items-end gap-2"><div className="flex-1"><select value={brStart} onChange={(e) => setBrStart(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div><span className="pb-3 text-stone-400">–</span><div className="flex-1"><select value={brEnd} onChange={(e) => setBrEnd(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div><button onClick={addBreakToForm} className="mb-0.5 rounded-xl bg-white/15 px-3 py-3 text-sm font-semibold text-white ring-1 ring-white/20">+ Break</button></div>{stBreaks.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{stBreaks.map((b, i) => (<span key={i} className="flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-1 text-xs text-amber-200 ring-1 ring-amber-400/30">{b}<button onClick={() => removeBreakFromForm(i)} className="text-amber-300 hover:text-amber-100">✕</button></span>))}</div>}</div>
+            <div className="pt-1"><div className="mb-1 text-xs font-medium text-stone-300">Working days &amp; hours</div><div className="space-y-1.5">{DAYS.map((d) => {
+              const on = stDays.includes(d);
+              const hrs = stDayHours[d] || ["09:00", "17:00"];
+              return (
+                <div key={d} className="flex items-center gap-2">
+                  <button onClick={() => toggleDay(d)} className={`w-14 shrink-0 rounded-lg py-1.5 text-sm ring-1 transition ${on ? "bg-amber-600 text-white ring-amber-500" : "bg-white/10 text-stone-300 ring-white/20"}`}>{d}</button>
+                  {on ? (
+                    <div className="flex flex-1 items-center gap-2">
+                      <select value={hrs[0]} onChange={(e) => setDayHour(d, 0, e.target.value)} className={`${select} flex-1`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select>
+                      <span className="text-stone-400">–</span>
+                      <select value={hrs[1]} onChange={(e) => setDayHour(d, 1, e.target.value)} className={`${select} flex-1`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select>
+                    </div>
+                  ) : (
+                    <span className="flex-1 text-sm text-stone-500">Off</span>
+                  )}
+                </div>
+              );
+            })}</div></div>
+            <div className="pt-1"><div className="mb-1 text-xs font-medium text-stone-300">Breaks (optional, applies to all days)</div><div className="flex items-end gap-2"><div className="flex-1"><select value={brStart} onChange={(e) => setBrStart(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div><span className="pb-3 text-stone-400">–</span><div className="flex-1"><select value={brEnd} onChange={(e) => setBrEnd(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div><button onClick={addBreakToForm} className="mb-0.5 rounded-xl bg-white/15 px-3 py-3 text-sm font-semibold text-white ring-1 ring-white/20">+ Break</button></div>{stBreaks.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{stBreaks.map((b, i) => (<span key={i} className="flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-1 text-xs text-amber-200 ring-1 ring-amber-400/30">{b}<button onClick={() => removeBreakFromForm(i)} className="text-amber-300 hover:text-amber-100">✕</button></span>))}</div>}</div>
             <div className="flex flex-wrap gap-2 pt-1">{colors.map((c) => (<button key={c.value} onClick={() => setStColor(c.value)} className={`h-8 w-8 rounded-full ${c.value} ${stColor === c.value ? "ring-2 ring-offset-2 ring-offset-stone-900 ring-white" : ""}`} title={c.label} />))}</div>
           </div>
           <div className="mt-3 flex gap-2"><button disabled={!stName} onClick={saveStaff} className={`flex-1 py-3 ${btnGold}`}>{editStaffId ? "Save changes" : "Add barber"}</button>{editStaffId && <button onClick={resetStaffForm} className="rounded-xl bg-white/10 px-4 py-3 text-sm font-medium text-stone-200">Cancel</button>}</div>
