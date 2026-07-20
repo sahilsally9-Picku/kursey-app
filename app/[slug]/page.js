@@ -167,17 +167,23 @@ export default function ShopBooking() {
     const { data: fresh } = await supabase.rpc("busy_times", { p_shop_id: shop.id, p_barber: barber.name, p_date: date.key });
     const clash = (fresh || []).some((b) => b.start_min != null && overlaps(slot, slot + dur, b.start_min, b.start_min + (b.duration_min || 30)));
     if (clash) { setSaving(false); alert("Sorry, that time was just taken."); setStep("time"); setSlot(null); setClientSecret(null); return false; }
-    const { data: inserted, error } = await supabase.from("bookings").insert({
-      shop_id: shop.id, service: service.name, price: service.price, barber: barber.name,
-      day: `${date.label} ${date.sub}`, slot: toLabel(slot),
-      booking_date: date.key, start_min: slot, duration_min: dur,
-      customer_name: name, phone: phone, email: email, wants_offers: offers,
-      customer_user_id: customer ? customer.user.id : null,
-      deposit_paid: depositPaid ? true : false,
-      deposit_amount: depositPaid ? (shop.deposit_amount || 0) : 0,
-      stripe_payment_intent: paymentIntentId || null,
-      status: "confirmed",
-    }).select("id").single();
+    const _bkRes = await fetch("/api/create-booking", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        shop_id: shop.id, service: service.name, price: service.price, barber: barber.name,
+        day: `${date.label} ${date.sub}`, slot: toLabel(slot),
+        booking_date: date.key, start_min: slot, duration_min: dur,
+        customer_name: name, phone: phone, email: email, wants_offers: offers,
+        customer_user_id: customer ? customer.user.id : null,
+        deposit_paid: depositPaid ? true : false,
+        deposit_amount: depositPaid ? (shop.deposit_amount || 0) : 0,
+        stripe_payment_intent: paymentIntentId || null,
+        status: "confirmed",
+      }),
+    });
+    const _bkJson = await _bkRes.json().catch(() => ({}));
+    const inserted = _bkJson.booking || null;
+    const error = _bkRes.ok ? null : { message: _bkJson.error || "Couldn't save booking" };
     setSaving(false);
     if (error) { alert("Something went wrong: " + error.message); return false; }
     if (inserted?.id && email) {
