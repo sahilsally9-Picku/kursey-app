@@ -32,6 +32,8 @@ export const metadata = {
 
 export const viewport = {
   themeColor: "#1c1917",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }) {
@@ -40,7 +42,7 @@ export default function RootLayout({ children }) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col overflow-x-hidden">
         {/* Global barbershop background — sits behind every page */}
         <div className="fixed inset-0 -z-10">
           <img src="/hero.jpg" alt="" className="h-full w-full object-cover" />
