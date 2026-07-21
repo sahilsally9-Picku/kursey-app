@@ -49,34 +49,33 @@ export default function Signup() {
     router.replace("/plan");
   }
 
-  const input = "w-full rounded-xl bg-white/95 px-4 py-3 text-sm text-stone-900 outline-none ring-1 ring-white/20 placeholder:text-stone-400 focus:ring-amber-500";
+  const input = "w-full rounded-xl bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-1 ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-[#13294b]";
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-10">
-      <div className="w-full max-w-sm rounded-3xl bg-white/10 p-7 shadow-2xl ring-1 ring-white/15 backdrop-blur-md">
-        <img src="/logo.png" alt="Kursey" className="mb-5 h-12 w-auto rounded-xl" />
-        <h1 className="text-xl font-bold text-white">Start your shop on Kursey</h1>
-        <p className="mb-5 text-sm text-stone-300">Create your account and booking page.</p>
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
+      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+        <img src="/logo.png" alt="Kursey" className="mb-5 h-10 w-auto" />
+        <h1 className="text-xl font-bold text-slate-900">Start your business on Kursey</h1>
+        <p className="mb-5 text-sm text-slate-500">Create your account and booking page.</p>
 
         <div className="space-y-2">
-          <input value={shopName} onChange={(e) => onShopName(e.target.value)} placeholder="Shop name (e.g. Fade & Co)" className={input} />
+          <input value={shopName} onChange={(e) => onShopName(e.target.value)} placeholder="Business name (e.g. Fade & Co)" className={input} />
           <div>
             <input value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} placeholder="link-name" className={input} />
-            <p className="mt-1 text-xs text-stone-300">Your booking link: kursey.com/{slug || "your-shop"}</p>
+            <p className="mt-1 text-xs text-slate-500">Your booking link: kursey.com/{slug || "your-shop"}</p>
           </div>
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" className={input} />
           <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password (min 6 characters)" type="password" className={input} />
         </div>
 
-        {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
+        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
-        <button disabled={loading} onClick={handleSignup}
-          className="mt-5 w-full rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 py-3 font-semibold text-white shadow-lg transition enabled:hover:from-amber-700 enabled:hover:to-amber-600 disabled:opacity-40">
-          {loading ? "Creating…" : "Create my shop"}
+        <button disabled={loading} onClick={handleSignup} className="mt-5 w-full rounded-xl bg-[#13294b] py-3 font-semibold text-white transition enabled:hover:bg-[#1d3a63] disabled:opacity-40">
+          {loading ? "Creating…" : "Create my business"}
         </button>
 
-        <p className="mt-4 text-center text-sm text-stone-300">
-          Already have a shop? <a href="/login" className="font-medium text-amber-400 hover:underline">Log in</a>
+        <p className="mt-4 text-center text-sm text-slate-500">
+          Already have a shop? <a href="/login" className="font-medium text-[#13294b] hover:underline">Log in</a>
         </p>
       </div>
     </div>
