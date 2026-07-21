@@ -166,9 +166,11 @@ export default function Home() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 sm:flex-row">
           <img src="/logo.png" alt="Kursey" className="h-8 w-auto" />
           <p className="text-sm text-slate-500">© {new Date().getFullYear()} Kursey. Booking software for appointment businesses.</p>
-          <div className="flex gap-4 text-sm text-slate-600">
+          <div className="flex flex-wrap justify-center gap-4 text-sm text-slate-600">
             <Link href="/login" className="hover:text-slate-900">Log in</Link>
             <Link href="/signup" className="hover:text-slate-900">Sign up</Link>
+            <Link href="/privacy" className="hover:text-slate-900">Privacy</Link>
+            <Link href="/terms" className="hover:text-slate-900">Terms</Link>
           </div>
         </div>
       </footer>
