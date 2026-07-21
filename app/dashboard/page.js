@@ -22,7 +22,6 @@ export default function Dashboard() {
       if (!shopData) { router.push("/signup"); return; }
       setShop(shopData); setChecking(false);
 
-      // if returning from checkout, confirm + activate
       const params = new URLSearchParams(window.location.search);
       if (params.get("sub") === "success" && shopData.subscription_status !== "active") {
         try {
@@ -52,7 +51,7 @@ export default function Dashboard() {
 
   async function handleLogout() { await supabase.auth.signOut(); router.push("/login"); }
 
-  if (checking) return <div className="flex min-h-screen items-center justify-center text-stone-300">Loading…</div>;
+  if (checking) return <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500">Loading…</div>;
 
   const totalBookings = bookings.length;
   const revenue = bookings.reduce((sum, b) => sum + (b.price || 0), 0);
@@ -80,17 +79,18 @@ export default function Dashboard() {
   const daysLeft = trialEnds ? Math.max(0, Math.ceil((trialEnds - new Date()) / (1000 * 60 * 60 * 24))) : 0;
   const isActive = status === "active";
 
-  const card = "rounded-2xl bg-stone-900/75 ring-1 ring-white/15 backdrop-blur-md";
-  const navBtn = "whitespace-nowrap rounded-lg bg-white/10 px-3 py-1.5 text-sm font-medium text-stone-200 ring-1 ring-white/15 hover:bg-white/15";
+  const card = "rounded-2xl border border-slate-200 bg-white shadow-sm";
+  const navBtn = "whitespace-nowrap rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50";
+  const navyBtn = "rounded-xl bg-[#13294b] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1d3a63]";
 
   return (
-    <div className="min-h-screen text-white">
+    <div className="min-h-screen bg-slate-50 text-slate-900">
       <div className="mx-auto max-w-2xl px-4 py-8">
-        {/* header — stacks on phones so buttons never get cramped */}
+        {/* header — stacks on phones */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">{shop.name}</h1>
-            <p className="truncate text-sm text-stone-300">kursey.com/{shop.slug}</p>
+            <p className="truncate text-sm text-slate-500">kursey.com/{shop.slug}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <a href="/analytics" className={navBtn}>Analytics</a>
@@ -102,65 +102,65 @@ export default function Dashboard() {
         {/* SUBSCRIPTION BANNER */}
         {isActive ? (
           <div className={`mt-4 flex flex-wrap items-center justify-between gap-3 p-4 ${card}`}>
-            <div><div className="font-semibold text-amber-400">Subscription active ✓</div><div className="text-sm text-stone-300">Thanks for being a Kursey member.</div></div>
-            <a href="/plan" className="shrink-0 whitespace-nowrap text-sm font-medium text-amber-400 hover:underline">Change plan</a>
+            <div><div className="font-semibold text-[#13294b]">Subscription active ✓</div><div className="text-sm text-slate-600">Thanks for being a Kursey member.</div></div>
+            <a href="/plan" className="shrink-0 whitespace-nowrap text-sm font-semibold text-[#13294b] hover:underline">Change plan</a>
           </div>
         ) : status === "past_due" ? (
           <div className={`mt-4 p-4 ${card}`}>
-            <div className="font-semibold text-red-300">Payment needed</div>
-            <div className="text-sm text-stone-300">Your booking page is paused until you subscribe.</div>
-            <a href="/plan" className="mt-3 inline-block rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg">Choose a plan</a>
+            <div className="font-semibold text-red-600">Payment needed</div>
+            <div className="text-sm text-slate-600">Your booking page is paused until you subscribe.</div>
+            <a href="/plan" className={`mt-3 inline-block ${navyBtn}`}>Choose a plan</a>
           </div>
         ) : (
           <div className={`mt-4 p-4 ${card}`}>
-            <div className="font-semibold text-white">Free trial — {daysLeft} day{daysLeft === 1 ? "" : "s"} left</div>
-            <div className="text-sm text-stone-300">Choose a plan any time to keep your booking page live after the trial.</div>
-            <a href="/plan" className="mt-3 inline-block rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg">Choose a plan</a>
+            <div className="font-semibold text-slate-900">Free trial — {daysLeft} day{daysLeft === 1 ? "" : "s"} left</div>
+            <div className="text-sm text-slate-600">Choose a plan any time to keep your booking page live after the trial.</div>
+            <a href="/plan" className={`mt-3 inline-block ${navyBtn}`}>Choose a plan</a>
           </div>
         )}
 
         {/* booking link */}
-        <div className="mt-4 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-500 p-4 text-white shadow-lg">
-          <div className="text-sm text-amber-50">Your booking link — share this with clients</div>
+        <div className="mt-4 rounded-2xl bg-[#13294b] p-4 text-white shadow-sm">
+          <div className="text-sm text-white/70">Your booking link — share this with clients</div>
           <div className="mt-1 flex items-center justify-between gap-2">
             <span className="min-w-0 truncate text-lg font-semibold">kursey.com/{shop.slug}</span>
-            <button onClick={() => { navigator.clipboard.writeText(`https://kursey.com/${shop.slug}`); }} className="shrink-0 whitespace-nowrap rounded-lg bg-white/20 px-3 py-1.5 text-sm font-medium ring-1 ring-white/30 hover:bg-white/30">Copy link</button>
+            <button onClick={() => { navigator.clipboard.writeText(`https://kursey.com/${shop.slug}`); }} className="shrink-0 whitespace-nowrap rounded-lg bg-white/15 px-3 py-1.5 text-sm font-medium ring-1 ring-white/25 hover:bg-white/25">Copy link</button>
           </div>
         </div>
 
         {/* headline stats */}
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className={`p-4 ${card}`}><div className="font-display text-3xl font-bold">{totalBookings}</div><div className="text-sm text-stone-300">Total bookings</div></div>
-          <div className={`p-4 ${card}`}><div className="font-display text-3xl font-bold text-amber-400">${revenue}</div><div className="text-sm text-stone-300">Booked revenue</div></div>
+          <div className={`p-4 ${card}`}><div className="font-display text-3xl font-bold">{totalBookings}</div><div className="text-sm text-slate-600">Total bookings</div></div>
+          <div className={`p-4 ${card}`}><div className="font-display text-3xl font-bold text-[#13294b]">${revenue}</div><div className="text-sm text-slate-600">Booked revenue</div></div>
         </div>
 
         {/* quick actions */}
         <div className="mt-4 space-y-3">
           <a href="/add-booking" className={`flex items-center justify-between gap-3 p-4 ${card}`}>
-            <div><div className="font-semibold">Add a booking</div><div className="text-sm text-stone-300">For walk-ins or phone bookings.</div></div>
-            <span className="shrink-0 rounded-lg bg-gradient-to-r from-amber-600 to-amber-500 px-4 py-2 text-sm font-semibold text-white shadow">Add</span>
+            <div><div className="font-semibold">Add a booking</div><div className="text-sm text-slate-600">For walk-ins or phone bookings.</div></div>
+            <span className="shrink-0 rounded-lg bg-[#13294b] px-4 py-2 text-sm font-semibold text-white">Add</span>
           </a>
           <a href="/settings" className={`flex items-center justify-between gap-3 p-4 ${card}`}>
-            <div><div className="font-semibold">Block off time</div><div className="text-sm text-stone-300">For lunch, vacation, or time off.</div></div>
-            <span className="shrink-0 rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/15">Block</span>
+            <div><div className="font-semibold">Block off time</div><div className="text-sm text-slate-600">For lunch, vacation, or time off.</div></div>
+            <span className="shrink-0 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Block</span>
           </a>
         </div>
 
         {/* VALUE SECTION */}
         <h2 className="mt-6 mb-2 font-display text-xl font-semibold">What Kursey is doing for you</h2>
         <div className="grid grid-cols-2 gap-3">
-          <div className={`p-4 ${card}`}><div className="text-2xl font-bold text-amber-400">${depositsCollected}</div><div className="text-sm text-stone-300">Deposits secured{depositsCount > 0 ? ` (${depositsCount})` : ""}</div></div>
-          <div className={`p-4 ${card}`}><div className="text-2xl font-bold text-amber-400">{afterHours}</div><div className="text-sm text-stone-300">Booked while you were closed</div></div>
-          <div className={`p-4 ${card}`}><div className="text-2xl font-bold">{upcoming}</div><div className="text-sm text-stone-300">Upcoming appointments</div></div>
-          <div className={`p-4 ${card}`}><div className="text-2xl font-bold">{repeatCustomers}</div><div className="text-sm text-stone-300">Repeat clients</div></div>
-          <div className={`p-4 ${card}`}><div className="text-2xl font-bold">{offersList}</div><div className="text-sm text-stone-300">On your marketing list</div></div>
-          <div className={`p-4 ${card}`}><div className="text-2xl font-bold">{totalBookings ? Math.round((afterHours / totalBookings) * 100) : 0}%</div><div className="text-sm text-stone-300">Bookings made after hours</div></div>
+          <div className={`p-4 ${card}`}><div className="text-2xl font-bold text-[#13294b]">${depositsCollected}</div><div className="text-sm text-slate-600">Deposits secured{depositsCount > 0 ? ` (${depositsCount})` : ""}</div></div>
+          <div className={`p-4 ${card}`}><div className="text-2xl font-bold text-[#13294b]">{afterHours}</div><div className="text-sm text-slate-600">Booked while you were closed</div></div>
+          <div className={`p-4 ${card}`}><div className="text-2xl font-bold">{upcoming}</div><div className="text-sm text-slate-600">Upcoming appointments</div></div>
+          <div className={`p-4 ${card}`}><div className="text-2xl font-bold">{repeatCustomers}</div><div className="text-sm text-slate-600">Repeat clients</div></div>
+          <div className={`p-4 ${card}`}><div className="text-2xl font-bold">{offersList}</div><div className="text-sm text-slate-600">On your marketing list</div></div>
+          <div className={`p-4 ${card}`}><div className="text-2xl font-bold">{totalBookings ? Math.round((afterHours / totalBookings) * 100) : 0}%</div><div className="text-sm text-slate-600">Bookings made after hours</div></div>
         </div>
 
         {/* list */}
         <h2 className="mt-6 mb-2 font-display text-xl font-semibold">Bookings</h2>
-        {loading ? <p className="text-stone-300">Loading…</p>
-        : bookings.length === 0 ? <p className={`p-4 text-stone-300 ${card}`}>No bookings yet. Share your booking link to get started.</p>
+        {loading ? <p className="text-slate-500">Loading…</p>
+        : bookings.length === 0 ? <p className={`p-4 text-slate-600 ${card}`}>No bookings yet. Share your booking link to get started.</p>
         : (
           <div className="space-y-2">
             {bookings.map((b) => (
@@ -168,14 +168,14 @@ export default function Dashboard() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="font-semibold">{b.customer_name}</div>
-                    <div className="text-sm text-stone-300">{b.service} · {b.barber}</div>
-                    <div className="text-sm text-stone-300">{b.day} at {b.slot}</div>
+                    <div className="text-sm text-slate-600">{b.service} · {b.barber}</div>
+                    <div className="text-sm text-slate-600">{b.day} at {b.slot}</div>
                   </div>
-                  <div className="shrink-0 text-right"><div className="font-semibold">${b.price}</div><div className="text-xs text-stone-400">{b.phone}</div></div>
+                  <div className="shrink-0 text-right"><div className="font-semibold">${b.price}</div><div className="text-xs text-slate-400">{b.phone}</div></div>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  {b.deposit_paid && <span className="inline-block rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-200 ring-1 ring-amber-400/30">Deposit paid ${b.deposit_amount} ✓</span>}
-                  {b.wants_offers && <span className="inline-block rounded-full bg-white/10 px-2 py-0.5 text-xs text-stone-200">on offers list</span>}
+                  {b.deposit_paid && <span className="inline-block rounded-full bg-[#13294b]/10 px-2 py-0.5 text-xs font-medium text-[#13294b] ring-1 ring-[#13294b]/20">Deposit paid ${b.deposit_amount} ✓</span>}
+                  {b.wants_offers && <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">on offers list</span>}
                 </div>
               </div>
             ))}
