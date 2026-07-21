@@ -136,7 +136,7 @@ export default function Dashboard() {
 
         {/* quick actions */}
         <div className="mt-4 space-y-3">
-          <a href="/settings" className={`flex items-center justify-between gap-3 p-4 ${card}`}>
+          <a href="/add-booking" className={`flex items-center justify-between gap-3 p-4 ${card}`}>
             <div><div className="font-semibold">Add a booking</div><div className="text-sm text-stone-300">For walk-ins or phone bookings.</div></div>
             <span className="shrink-0 rounded-lg bg-gradient-to-r from-amber-600 to-amber-500 px-4 py-2 text-sm font-semibold text-white shadow">Add</span>
           </a>
