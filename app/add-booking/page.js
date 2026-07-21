@@ -87,12 +87,11 @@ export default function AddBooking() {
     setError("");
     if (!name.trim()) { setError("Please enter the customer's name."); return; }
     if (!service) { setError("Please choose a service."); return; }
-    if (!barber) { setError("Please choose a barber."); return; }
+    if (!barber) { setError("Please choose a staff member."); return; }
     if (!date || slot == null) { setError("Please choose a date and time."); return; }
 
     setSaving(true);
     const dur = service.mins || 30;
-    // re-check the slot is still free
     const { data: fresh } = await supabase.rpc("busy_times", { p_shop_id: shop.id, p_barber: barber.name, p_date: date.key });
     const clash = (fresh || []).some((b) => b.start_min != null && overlaps(slot, slot + dur, b.start_min, b.start_min + (b.duration_min || 30)));
     if (clash) { setSaving(false); setError("That time was just taken — please pick another."); setSlot(null); return; }
@@ -119,31 +118,31 @@ export default function AddBooking() {
     setService(null); setBarber(null); setDate(null); setSlot(null); setDayBookings([]); setError("");
   }
 
-  if (checking) return <div className="flex min-h-screen items-center justify-center text-stone-300">Loading…</div>;
+  if (checking) return <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500">Loading…</div>;
 
-  const card = "rounded-2xl bg-stone-900/75 ring-1 ring-white/15 backdrop-blur-md";
-  const input = "w-full rounded-xl bg-white/95 px-4 py-3 text-sm text-stone-900 outline-none ring-1 ring-white/20 placeholder:text-stone-400 focus:ring-amber-500";
-  const label = "mb-1 block text-sm font-medium text-stone-200";
+  const card = "rounded-2xl border border-slate-200 bg-white shadow-sm";
+  const input = "w-full rounded-xl bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-1 ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-[#13294b]";
+  const label = "mb-1 block text-sm font-medium text-slate-700";
   const dates = barber ? upcomingDates(barber) : [];
   const slots = (barber && service && date) ? tightSlots(barber, service, dayBookings) : [];
 
   return (
-    <div className="min-h-screen text-white">
+    <div className="min-h-screen bg-slate-50 text-slate-900">
       <div className="mx-auto max-w-lg px-4 py-8">
         <div className="flex items-center justify-between">
           <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Add a booking</h1>
-          <a href="/dashboard" className="whitespace-nowrap text-sm font-medium text-amber-400 hover:underline">← Dashboard</a>
+          <a href="/dashboard" className="whitespace-nowrap text-sm font-medium text-[#13294b] hover:underline">← Dashboard</a>
         </div>
-        <p className="mt-1 text-sm text-stone-300">For walk-ins or phone bookings.</p>
+        <p className="mt-1 text-sm text-slate-500">For walk-ins or phone bookings.</p>
 
         {done ? (
           <div className={`mt-6 p-6 text-center ${card}`}>
-            <div className="font-display text-xl font-semibold text-amber-400">Booking added ✓</div>
-            <p className="mt-1 text-sm text-stone-300">{name} · {service?.name} with {barber?.name}</p>
-            <p className="text-sm text-stone-300">{date?.label} {date?.sub} at {slot != null ? toLabel(slot) : ""}</p>
+            <div className="font-display text-xl font-semibold text-[#13294b]">Booking added ✓</div>
+            <p className="mt-1 text-sm text-slate-600">{name} · {service?.name} with {barber?.name}</p>
+            <p className="text-sm text-slate-600">{date?.label} {date?.sub} at {slot != null ? toLabel(slot) : ""}</p>
             <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
-              <button onClick={addAnother} className="rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg hover:from-amber-700 hover:to-amber-600">Add another</button>
-              <a href="/dashboard" className="rounded-xl bg-white/10 px-5 py-2.5 text-center text-sm font-semibold text-white ring-1 ring-white/15 hover:bg-white/15">Back to dashboard</a>
+              <button onClick={addAnother} className="rounded-xl bg-[#13294b] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#1d3a63]">Add another</button>
+              <a href="/dashboard" className="rounded-xl border border-slate-300 px-5 py-2.5 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50">Back to dashboard</a>
             </div>
           </div>
         ) : (
@@ -157,14 +156,14 @@ export default function AddBooking() {
               <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" className={input} />
             </div>
             <div>
-              <label className={label}>Email <span className="text-stone-400">— optional (sends a confirmation)</span></label>
+              <label className={label}>Email <span className="text-slate-400">— optional (sends a confirmation)</span></label>
               <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@email.com" type="email" className={input} />
             </div>
 
             <div>
               <label className={label}>Service</label>
               {services.length === 0 ? (
-                <p className="text-sm text-stone-400">No services yet. Add some in <a href="/settings" className="text-amber-400 underline">Settings</a>.</p>
+                <p className="text-sm text-slate-500">No services yet. Add some in <a href="/settings" className="text-[#13294b] underline">Settings</a>.</p>
               ) : (
                 <select value={service?.id ?? ""} onChange={(e) => pickService(e.target.value)} className={input}>
                   <option value="">Choose a service…</option>
@@ -174,12 +173,12 @@ export default function AddBooking() {
             </div>
 
             <div>
-              <label className={label}>Barber</label>
+              <label className={label}>Staff member</label>
               {staff.length === 0 ? (
-                <p className="text-sm text-stone-400">No barbers yet. Add staff in <a href="/settings" className="text-amber-400 underline">Settings</a>.</p>
+                <p className="text-sm text-slate-500">No staff yet. Add them in <a href="/settings" className="text-[#13294b] underline">Settings</a>.</p>
               ) : (
                 <select value={barber?.id ?? ""} onChange={(e) => pickBarber(e.target.value)} className={input}>
-                  <option value="">Choose a barber…</option>
+                  <option value="">Choose a staff member…</option>
                   {staff.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
               )}
@@ -189,12 +188,12 @@ export default function AddBooking() {
               <div>
                 <label className={label}>Date</label>
                 {dates.length === 0 ? (
-                  <p className="text-sm text-stone-400">{barber.name} has no working days set. Set their schedule in Settings.</p>
+                  <p className="text-sm text-slate-500">{barber.name} has no working days set. Set their schedule in Settings.</p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {dates.map((d) => (
                       <button key={d.key} onClick={() => pickDate(d)}
-                        className={`rounded-xl px-3 py-2 text-sm font-medium ring-1 ${date?.key === d.key ? "bg-amber-500 text-white ring-amber-400" : "bg-white/10 text-stone-200 ring-white/15 hover:bg-white/15"}`}>
+                        className={`rounded-xl px-3 py-2 text-sm font-medium ring-1 ${date?.key === d.key ? "bg-[#13294b] text-white ring-[#13294b]" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}>
                         {d.label} <span className="opacity-70">{d.sub}</span>
                       </button>
                     ))}
@@ -207,14 +206,14 @@ export default function AddBooking() {
               <div>
                 <label className={label}>Time</label>
                 {loadingSlots ? (
-                  <p className="text-sm text-stone-400">Loading times…</p>
+                  <p className="text-sm text-slate-500">Loading times…</p>
                 ) : slots.length === 0 ? (
-                  <p className="text-sm text-stone-400">No open slots that day for a {service.mins || 30}-minute service.</p>
+                  <p className="text-sm text-slate-500">No open slots that day for a {service.mins || 30}-minute service.</p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {slots.map((m) => (
                       <button key={m} onClick={() => setSlot(m)}
-                        className={`rounded-xl px-3 py-2 text-sm font-medium ring-1 ${slot === m ? "bg-amber-500 text-white ring-amber-400" : "bg-white/10 text-stone-200 ring-white/15 hover:bg-white/15"}`}>
+                        className={`rounded-xl px-3 py-2 text-sm font-medium ring-1 ${slot === m ? "bg-[#13294b] text-white ring-[#13294b]" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}>
                         {toLabel(m)}
                       </button>
                     ))}
@@ -223,10 +222,10 @@ export default function AddBooking() {
               </div>
             )}
 
-            {error && <p className="text-sm text-red-300">{error}</p>}
+            {error && <p className="text-sm text-red-600">{error}</p>}
 
             <button onClick={save} disabled={saving}
-              className="w-full rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 py-3 font-semibold text-white shadow-lg transition enabled:hover:from-amber-700 enabled:hover:to-amber-600 disabled:opacity-40">
+              className="w-full rounded-xl bg-[#13294b] py-3 font-semibold text-white shadow-sm transition enabled:hover:bg-[#1d3a63] disabled:opacity-40">
               {saving ? "Saving…" : "Add booking"}
             </button>
           </div>
