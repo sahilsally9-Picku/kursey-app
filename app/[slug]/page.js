@@ -214,6 +214,8 @@ export default function ShopBooking() {
 
   if (loading) return <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-500">Loading…</div>;
   if (notFound) return <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 text-center"><div><h1 className="text-2xl font-bold text-slate-800">Shop not found</h1><p className="mt-1 text-slate-500">No shop at kursey.com/{slug}.</p></div></div>;
+  const shopLocked = shop && shop.subscription_status !== "active" && (shop.subscription_status === "past_due" || (shop.trial_ends_at && new Date(shop.trial_ends_at) < new Date()));
+  if (shopLocked) return <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 text-center"><div><h1 className="text-2xl font-bold text-slate-800">Booking unavailable</h1><p className="mt-1 text-slate-500">This booking page is temporarily unavailable. Please contact the business directly to book.</p></div></div>;
 
   if (shop) {
     const status = shop.subscription_status || "trialing";

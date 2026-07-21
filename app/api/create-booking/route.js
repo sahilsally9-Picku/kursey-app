@@ -11,6 +11,21 @@ export async function POST(req) {
     const b = await req.json();
     if (!b.shop_id) return NextResponse.json({ error: "Missing shop" }, { status: 400 });
 
+    // trial lock: block bookings if the trial has ended and they haven't subscribed
+    const { data: shop } = await supabaseAdmin
+      .from("shops")
+      .select("subscription_status, trial_ends_at")
+      .eq("id", b.shop_id)
+      .single();
+    if (shop) {
+      const active = shop.subscription_status === "active";
+      const expired = shop.trial_ends_at && new Date(shop.trial_ends_at) < new Date();
+      const locked = !active && (shop.subscription_status === "past_due" || expired);
+      if (locked) {
+        return NextResponse.json({ error: "This booking page isn't active right now. Please contact the business." }, { status: 403 });
+      }
+    }
+
     const { data, error } = await supabaseAdmin
       .from("bookings")
       .insert({

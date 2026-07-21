@@ -111,6 +111,12 @@ export default function Dashboard() {
             <div className="text-sm text-slate-600">Your booking page is paused until you subscribe.</div>
             <a href="/plan" className={`mt-3 inline-block ${navyBtn}`}>Choose a plan</a>
           </div>
+        ) : (trialEnds && trialEnds < new Date()) ? (
+          <div className={`mt-4 p-4 ${card}`}>
+            <div className="font-semibold text-red-600">Your free trial has ended</div>
+            <div className="text-sm text-slate-600">Your booking page is paused. Subscribe to reactivate it and start taking bookings again.</div>
+            <a href="/plan" className={`mt-3 inline-block ${navyBtn}`}>Subscribe now</a>
+          </div>
         ) : (
           <div className={`mt-4 p-4 ${card}`}>
             <div className="font-semibold text-slate-900">Free trial — {daysLeft} day{daysLeft === 1 ? "" : "s"} left</div>
