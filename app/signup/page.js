@@ -4,9 +4,19 @@ import { useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useRouter } from "next/navigation";
 
+const BUSINESS_TYPES = [
+  { value: "barbershop", label: "Barbershop" },
+  { value: "salon", label: "Hair / beauty salon" },
+  { value: "nails", label: "Nail salon" },
+  { value: "waxing", label: "Waxing studio" },
+  { value: "petgrooming", label: "Pet grooming" },
+  { value: "other", label: "Other appointment business" },
+];
+
 export default function Signup() {
   const [shopName, setShopName] = useState("");
   const [slug, setSlug] = useState("");
+  const [businessType, setBusinessType] = useState("barbershop");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -34,7 +44,7 @@ export default function Signup() {
     }
 
     const { error: shopErr } = await supabase.from("shops").insert({
-      owner_id: userId, name: shopName, slug: slug,
+      owner_id: userId, name: shopName, slug: slug, business_type: businessType,
     });
     setLoading(false);
     if (shopErr) {
@@ -60,6 +70,12 @@ export default function Signup() {
 
         <div className="space-y-2">
           <input value={shopName} onChange={(e) => onShopName(e.target.value)} placeholder="Business name (e.g. Fade & Co)" className={input} />
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">What kind of business?</label>
+            <select value={businessType} onChange={(e) => setBusinessType(e.target.value)} className={input}>
+              {BUSINESS_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </div>
           <div>
             <input value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} placeholder="link-name" className={input} />
             <p className="mt-1 text-xs text-slate-500">Your booking link: kursey.com/{slug || "your-shop"}</p>
