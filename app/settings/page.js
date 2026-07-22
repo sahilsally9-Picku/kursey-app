@@ -151,6 +151,25 @@ function SettingsInner() {
     setCreatingLogin(false);
   }
 
+  const [deleteText, setDeleteText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  async function deleteAccount() {
+    if (deleteText !== "DELETE") { alert('Type DELETE to confirm.'); return; }
+    if (!confirm("This permanently deletes your shop, all bookings, staff, services, and your login. This cannot be undone. Continue?")) return;
+    setDeleting(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    try {
+      const res = await fetch("/api/delete-account", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: session.user.id }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) { setDeleting(false); alert("Couldn't delete: " + (data.error || "please try again")); return; }
+      await supabase.auth.signOut();
+      window.location.href = "/";
+    } catch (err) { setDeleting(false); alert("Error: " + err.message); }
+  }
+
   if (checking) return <div className="flex min-h-screen items-center justify-center text-slate-600">Loading…</div>;
 
   const input = "w-full rounded-xl bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-1 ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-[#13294b]";
@@ -253,6 +272,15 @@ function SettingsInner() {
             </div>
           </div>
         ))}</div>}
+
+        {/* DANGER ZONE */}
+        <h2 className="mt-8 mb-2 font-display text-xl font-semibold text-red-600">Danger zone</h2>
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+          <div className="font-semibold text-slate-900">Delete my account</div>
+          <p className="mt-1 text-sm text-slate-600">Permanently removes your shop, all bookings, staff, services, reviews, and your login. This cannot be undone.</p>
+          <input value={deleteText} onChange={(e) => setDeleteText(e.target.value)} placeholder='Type DELETE to confirm' className="mt-3 w-full rounded-xl bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-1 ring-red-200 placeholder:text-slate-400 focus:ring-2 focus:ring-red-400" />
+          <button onClick={deleteAccount} disabled={deleting || deleteText !== "DELETE"} className="mt-3 rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition enabled:hover:bg-red-700 disabled:opacity-40">{deleting ? "Deleting…" : "Delete my account permanently"}</button>
+        </div>
       </div>
     </div>
   );
