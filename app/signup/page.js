@@ -6,10 +6,22 @@ import { useRouter } from "next/navigation";
 
 const BUSINESS_TYPES = [
   { value: "barbershop", label: "Barbershop" },
-  { value: "salon", label: "Hair / beauty salon" },
+  { value: "hair_salon", label: "Hair salon" },
   { value: "nails", label: "Nail salon" },
   { value: "waxing", label: "Waxing studio" },
-  { value: "petgrooming", label: "Pet grooming" },
+  { value: "lashes_brows", label: "Lash & brow studio" },
+  { value: "spa", label: "Spa / massage" },
+  { value: "skincare", label: "Skincare / facials" },
+  { value: "medspa", label: "Med spa / aesthetics" },
+  { value: "tattoo", label: "Tattoo & piercing" },
+  { value: "tanning", label: "Tanning / spray tan" },
+  { value: "pet_grooming", label: "Pet grooming" },
+  { value: "personal_trainer", label: "Personal trainer / fitness" },
+  { value: "wellness", label: "Therapy / wellness" },
+  { value: "tutor", label: "Tutor / lessons" },
+  { value: "photographer", label: "Photographer" },
+  { value: "auto", label: "Auto detailing / repair" },
+  { value: "home_services", label: "Home / cleaning services" },
   { value: "other", label: "Other appointment business" },
 ];
 
