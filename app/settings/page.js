@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { supabase } from "../../lib/supabase";
+import { terms, cap, BUSINESS_TYPES } from "../../lib/terms";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const colors = [
@@ -45,6 +46,7 @@ function SettingsInner() {
   const [loginFor, setLoginFor] = useState(null);
   const [loginEmail, setLoginEmail] = useState(""); const [loginPass, setLoginPass] = useState("");
   const [creatingLogin, setCreatingLogin] = useState(false);
+  const [businessType, setBusinessType] = useState("barbershop");
 
   useEffect(() => {
     async function init() {
@@ -53,7 +55,7 @@ function SettingsInner() {
       const { data: shopData } = await supabase.from("shops").select("*").eq("owner_id", session.user.id).limit(1).single();
       if (!shopData) { router.push("/signup"); return; }
       setShop(shopData);
-      setBName(shopData.name || ""); setBDesc(shopData.description || ""); setBAddress(shopData.address || ""); setBPhone(shopData.phone || "");
+      setBName(shopData.name || ""); setBDesc(shopData.description || ""); setBAddress(shopData.address || ""); setBPhone(shopData.phone || ""); setBusinessType(shopData.business_type || "barbershop");
       setDepAmount(shopData.deposit_amount || 10);
       setChecking(false);
       loadServices(shopData.id); loadStaff(shopData.id);
@@ -97,10 +99,10 @@ function SettingsInner() {
   async function saveInfo() {
     if (!bName) { alert("Business name can't be empty."); return; }
     setSavingInfo(true); setInfoSaved(false);
-    const { error } = await supabase.from("shops").update({ name: bName, description: bDesc, address: bAddress, phone: bPhone }).eq("id", shop.id);
+    const { error } = await supabase.from("shops").update({ name: bName, description: bDesc, address: bAddress, phone: bPhone, business_type: businessType }).eq("id", shop.id);
     setSavingInfo(false);
     if (error) { alert("Error: " + error.message); return; }
-    setShop({ ...shop, name: bName, description: bDesc, address: bAddress, phone: bPhone });
+    setShop({ ...shop, name: bName, description: bDesc, address: bAddress, phone: bPhone, business_type: businessType });
     setInfoSaved(true); setTimeout(() => setInfoSaved(false), 2000);
   }
 
@@ -176,6 +178,7 @@ function SettingsInner() {
   const select = "rounded-xl bg-white px-3 py-3 text-sm text-slate-900 outline-none ring-1 ring-slate-300 focus:ring-2 focus:ring-[#13294b]";
   const card = "rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm";
   const navyBtn = "rounded-xl bg-[#13294b] font-semibold text-white shadow-sm transition enabled:hover:bg-[#1d3a63] disabled:opacity-40";
+  const t = terms(businessType);
   const connected = !!shop.stripe_account_id;
   const justReturned = searchParams.get("stripe") === "done";
 
@@ -212,7 +215,7 @@ function SettingsInner() {
         {/* BUSINESS INFO */}
         <h2 className="mt-8 mb-2 font-display text-xl font-semibold">Business info</h2>
         <div className={`p-4 ${card}`}>
-          <div className="space-y-2"><input value={bName} onChange={(e) => setBName(e.target.value)} placeholder="Business name" className={input} /><textarea value={bDesc} onChange={(e) => setBDesc(e.target.value)} placeholder="Describe your business" rows={3} className={`${input} resize-none`} /><input value={bAddress} onChange={(e) => setBAddress(e.target.value)} placeholder="Address" className={input} /><input value={bPhone} onChange={(e) => setBPhone(e.target.value)} placeholder="Phone" className={input} /></div>
+          <div className="space-y-2"><input value={bName} onChange={(e) => setBName(e.target.value)} placeholder="Business name" className={input} /><textarea value={bDesc} onChange={(e) => setBDesc(e.target.value)} placeholder="Describe your business" rows={3} className={`${input} resize-none`} /><input value={bAddress} onChange={(e) => setBAddress(e.target.value)} placeholder="Address" className={input} /><input value={bPhone} onChange={(e) => setBPhone(e.target.value)} placeholder="Phone" className={input} /><div><label className="mb-1 block text-xs font-medium text-slate-600">Business type</label><select value={businessType} onChange={(e) => setBusinessType(e.target.value)} className={input}>{BUSINESS_TYPES.map((bt) => <option key={bt.value} value={bt.value}>{bt.label}</option>)}</select></div></div>
           <div className="mt-3 flex items-center gap-3"><button disabled={savingInfo || !bName} onClick={saveInfo} className={`px-5 py-3 ${navyBtn}`}>{savingInfo ? "Saving…" : "Save info"}</button>{infoSaved && <span className="text-sm font-medium text-[#13294b]">Saved ✓</span>}</div>
         </div>
 
@@ -233,21 +236,21 @@ function SettingsInner() {
         {services.length > 0 && <div className="mt-2 space-y-2">{services.map((s) => (<div key={s.id} className={`flex items-start justify-between p-4 ${card}`}><div className="pr-3"><div className="font-medium">{s.name}</div><div className="text-sm text-slate-600">{s.mins} min · ${s.price}</div>{s.description && <div className="mt-0.5 font-display text-xs italic text-slate-500">{s.description}</div>}</div><div className="flex shrink-0 items-center gap-3"><button onClick={() => startEditService(s)} className="text-sm text-[#13294b] hover:underline">Edit</button><button onClick={() => deleteService(s.id)} className="text-sm text-red-600 hover:underline">Remove</button></div></div>))}</div>}
 
         {/* STAFF */}
-        <h2 className="mt-8 mb-2 font-display text-xl font-semibold">Staff ({staff.length})</h2>
+        <h2 className="mt-8 mb-2 font-display text-xl font-semibold">{cap(t.staffPlural)} ({staff.length})</h2>
         <div className={`p-4 ${editStaffId ? "rounded-2xl bg-white ring-1 ring-[#13294b]/30 shadow-sm" : card}`}>
-          {editStaffId && <p className="mb-2 text-sm font-medium text-[#13294b]">Editing staff member…</p>}
+          {editStaffId && <p className="mb-2 text-sm font-medium text-[#13294b]">Editing {t.staff}…</p>}
           <div className="space-y-2">
             <div className="flex items-center gap-3"><div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full bg-slate-100 text-xs text-slate-500">{stPhoto ? <img src={stPhoto} alt="" className="h-full w-full object-cover" /> : "Photo"}</div><label className="cursor-pointer rounded-xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-900 ring-1 ring-slate-300">{uploadingPhoto ? "Uploading…" : stPhoto ? "Change photo" : "Upload photo"}<input type="file" accept="image/*" className="hidden" onChange={(e) => uploadStaffPhoto(e.target.files[0])} disabled={uploadingPhoto} /></label>{stPhoto && <button onClick={() => setStPhoto("")} className="text-sm text-red-600 hover:underline">Remove</button>}</div>
             <input value={stName} onChange={(e) => setStName(e.target.value)} placeholder="Name (e.g. Marcus)" className={input} />
             <input value={stSpecialty} onChange={(e) => setStSpecialty(e.target.value)} placeholder="Specialty" className={input} />
-            <textarea value={stBio} onChange={(e) => setStBio(e.target.value)} placeholder="About this staff member" rows={3} className={`${input} resize-none`} />
+            <textarea value={stBio} onChange={(e) => setStBio(e.target.value)} placeholder={`About this ${t.staff}`} rows={3} className={`${input} resize-none`} />
             <div className="pt-1"><div className="mb-1 text-xs font-medium text-slate-600">Work photos</div><div className="flex flex-wrap gap-2">{stWork.map((url, i) => (<div key={i} className="relative h-16 w-16 overflow-hidden rounded-lg ring-1 ring-slate-200"><img src={url} alt="" className="h-full w-full object-cover" /><button onClick={() => removeWorkPhoto(i)} className="absolute right-0 top-0 grid h-5 w-5 place-items-center rounded-bl-lg bg-black/60 text-xs text-white">✕</button></div>))}<label className="grid h-16 w-16 cursor-pointer place-items-center rounded-lg bg-slate-50 text-2xl text-slate-500 ring-1 ring-dashed ring-slate-300 hover:bg-slate-100">{uploadingWork ? "…" : "+"}<input type="file" accept="image/*" className="hidden" onChange={(e) => uploadWorkPhoto(e.target.files[0])} disabled={uploadingWork} /></label></div></div>
             <div className="pt-1"><div className="mb-1 text-xs font-medium text-slate-600">Working days</div><div className="flex flex-wrap gap-1.5">{DAYS.map((d) => (<button key={d} onClick={() => toggleDay(d)} className={`rounded-lg px-3 py-1.5 text-sm ring-1 transition ${stDays.includes(d) ? "bg-[#13294b] text-white ring-[#13294b]" : "bg-slate-100 text-slate-700 ring-slate-300"}`}>{d}</button>))}</div></div>
             <div className="flex items-center gap-2 pt-1"><div className="flex-1"><div className="mb-1 text-xs font-medium text-slate-600">Start</div><select value={stStart} onChange={(e) => setStStart(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div><div className="flex-1"><div className="mb-1 text-xs font-medium text-slate-600">End</div><select value={stEnd} onChange={(e) => setStEnd(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div></div>
             <div className="pt-1"><div className="mb-1 text-xs font-medium text-slate-600">Breaks (optional)</div><div className="flex items-end gap-2"><div className="flex-1"><select value={brStart} onChange={(e) => setBrStart(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div><span className="pb-3 text-slate-500">–</span><div className="flex-1"><select value={brEnd} onChange={(e) => setBrEnd(e.target.value)} className={`${select} w-full`}>{TIMES.map((t) => <option key={t} value={t}>{t}</option>)}</select></div><button onClick={addBreakToForm} className="mb-0.5 rounded-xl bg-slate-100 px-3 py-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-300">+ Break</button></div>{stBreaks.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{stBreaks.map((b, i) => (<span key={i} className="flex items-center gap-1 rounded-full bg-[#13294b]/10 px-2 py-1 text-xs text-[#13294b] ring-1 ring-[#13294b]/20">{b}<button onClick={() => removeBreakFromForm(i)} className="text-[#13294b]">✕</button></span>))}</div>}</div>
             <div className="flex flex-wrap gap-2 pt-1">{colors.map((c) => (<button key={c.value} onClick={() => setStColor(c.value)} className={`h-8 w-8 rounded-full ${c.value} ${stColor === c.value ? "ring-2 ring-offset-2 ring-offset-white ring-[#13294b]" : ""}`} title={c.label} />))}</div>
           </div>
-          <div className="mt-3 flex gap-2"><button disabled={!stName} onClick={saveStaff} className={`flex-1 py-3 ${navyBtn}`}>{editStaffId ? "Save changes" : "Add staff"}</button>{editStaffId && <button onClick={resetStaffForm} className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700">Cancel</button>}</div>
+          <div className="mt-3 flex gap-2"><button disabled={!stName} onClick={saveStaff} className={`flex-1 py-3 ${navyBtn}`}>{editStaffId ? "Save changes" : `Add ${t.staff}`}</button>{editStaffId && <button onClick={resetStaffForm} className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700">Cancel</button>}</div>
         </div>
         {staff.length > 0 && <div className="mt-2 space-y-2">{staff.map((st) => (
           <div key={st.id} className={`p-4 ${card}`}>
@@ -261,8 +264,8 @@ function SettingsInner() {
             <div className="mt-2 border-t border-slate-200 pt-2">
               {loginFor === st.id ? (
                 <div className="space-y-2">
-                  <div className="text-xs font-medium text-slate-600">{st.login_email ? "Reset this staff login" : "Create a login for this staff member"}</div>
-                  <input value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder="Staff email" type="email" className={input} />
+                  <div className="text-xs font-medium text-slate-600">{st.login_email ? `Reset this ${t.staff} login` : `Create a login for this ${t.staff}`}</div>
+                  <input value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder={`${cap(t.staff)} email`} type="email" className={input} />
                   <input value={loginPass} onChange={(e) => setLoginPass(e.target.value)} placeholder="Password (min 6)" type="password" className={input} />
                   <div className="flex gap-2"><button onClick={createBarberLogin} disabled={creatingLogin} className={`flex-1 py-2.5 text-sm ${navyBtn}`}>{creatingLogin ? "Creating…" : "Create login"}</button><button onClick={() => setLoginFor(null)} className="rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-medium text-slate-700">Cancel</button></div>
                 </div>
