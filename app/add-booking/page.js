@@ -62,6 +62,7 @@ export default function AddBooking() {
   const [done, setDone] = useState(false);
   const [doneInfo, setDoneInfo] = useState(null);
   const [error, setError] = useState("");
+  const [classSpots, setClassSpots] = useState([]);
 
   const router = useRouter();
 
@@ -99,7 +100,19 @@ export default function AddBooking() {
   const soloService = picked.length === 1 ? picked[0] : null;
   const gapAfter = soloService ? (soloService.gap_after_min || 0) : 0;
   const gapMin = soloService ? (soloService.gap_min || 0) : 0;
+  const classCap = soloService ? (soloService.capacity || 1) : 1;
+  const isClass = classCap > 1;
+  const soloName = soloService ? soloService.name : "";
   const t = terms(shop?.business_type);
+
+  useEffect(() => {
+    async function loadSpots() {
+      if (!isClass || !barber || !date || !shop) { setClassSpots([]); return; }
+      const { data } = await supabase.rpc("class_spots", { p_shop_id: shop.id, p_barber: barber.name, p_date: date.key, p_service: soloName });
+      setClassSpots(data || []);
+    }
+    loadSpots();
+  }, [isClass, soloName, barber, date, shop]);
 
   function toggleService(s) { setPicked((prev) => prev.some((p) => p.id === s.id) ? prev.filter((p) => p.id !== s.id) : [...prev, s]); setSlot(null); }
   function pickBarber(id) { const b = staff.find((x) => String(x.id) === String(id)) || null; setBarber(b); setDate(null); setSlot(null); }
@@ -115,8 +128,16 @@ export default function AddBooking() {
     setSaving(true);
     const dur = totalMins || 30;
     const { data: fresh } = await supabase.rpc("busy_times", { p_shop_id: shop.id, p_barber: barber.name, p_date: date.key });
+    let joiningClass = false;
+    if (isClass) {
+      const { data: freshSpots } = await supabase.rpc("class_spots", { p_shop_id: shop.id, p_barber: barber.name, p_date: date.key, p_service: soloName });
+      const row = (freshSpots || []).find((cs) => cs.start_min === slot);
+      const takenNow = row ? Number(row.taken) : 0;
+      if (takenNow >= classCap) { setSaving(false); setError("That class just filled up — please pick another time."); setSlot(null); return; }
+      joiningClass = takenNow > 0;
+    }
     const myBlocks = activeBlocks(dur, gapAfter, gapMin);
-    const clash = (fresh || []).some((b) => b.start_min != null && myBlocks.some((bl) => overlaps(slot + bl.o, slot + bl.o + bl.l, b.start_min, b.start_min + (b.duration_min || 30))));
+    const clash = !joiningClass && (fresh || []).some((b) => b.start_min != null && myBlocks.some((bl) => overlaps(slot + bl.o, slot + bl.o + bl.l, b.start_min, b.start_min + (b.duration_min || 30))));
     if (clash) { setSaving(false); setError("That time was just taken — please pick another."); setSlot(null); return; }
 
     const res = await fetch("/api/create-booking", {
@@ -128,7 +149,7 @@ export default function AddBooking() {
         customer_name: name, phone: phone, email: email, wants_offers: false,
         customer_user_id: null, deposit_paid: false, deposit_amount: 0,
         stripe_payment_intent: null, status: "confirmed",
-        gap_after_min: gapAfter, gap_min: gapMin,
+        gap_after_min: gapAfter, gap_min: gapMin, capacity: classCap,
       }),
     });
     const json = await res.json().catch(() => ({}));
@@ -152,7 +173,10 @@ export default function AddBooking() {
   const input = "w-full rounded-xl bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-1 ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-[#13294b]";
   const label = "mb-1 block text-sm font-medium text-slate-700";
   const dates = barber ? upcomingDates(barber) : [];
-  const slots = (barber && picked.length > 0 && date) ? tightSlots(barber, totalMins, gapAfter, gapMin, dayBookings) : [];
+  const baseSlots = (barber && picked.length > 0 && date) ? tightSlots(barber, totalMins, gapAfter, gapMin, dayBookings) : [];
+  const spotsTaken = {}; classSpots.forEach((cs) => { spotsTaken[cs.start_min] = Number(cs.taken); });
+  const openClassTimes = isClass ? classSpots.filter((cs) => Number(cs.taken) < classCap).map((cs) => cs.start_min) : [];
+  const slots = [...new Set([...baseSlots, ...openClassTimes])].sort((a, b) => a - b);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -201,7 +225,7 @@ export default function AddBooking() {
                         <button key={s.id} onClick={() => toggleService(s)} className={`flex w-full items-center justify-between rounded-xl bg-white px-4 py-3 text-left transition ${on ? "ring-2 ring-[#13294b]" : "ring-1 ring-slate-300 hover:ring-[#13294b]"}`}>
                           <span className="flex items-center gap-3">
                             <span className={`grid h-5 w-5 shrink-0 place-items-center rounded border text-xs text-white ${on ? "border-[#13294b] bg-[#13294b]" : "border-slate-300"}`}>{on ? "✓" : ""}</span>
-                            <span><span className="text-sm font-medium">{s.name}</span><span className="ml-2 text-xs text-slate-500">{s.mins || 30} min</span></span>
+                            <span><span className="text-sm font-medium">{s.name}</span><span className="ml-2 text-xs text-slate-500">{s.mins || 30} min{s.capacity > 1 ? ` · class of ${s.capacity}` : ""}</span></span>
                           </span>
                           <span className="shrink-0 text-sm font-semibold">${s.price}</span>
                         </button>
@@ -209,7 +233,7 @@ export default function AddBooking() {
                     })}
                   </div>
                   {picked.length > 0 && (
-                    <p className="mt-2 text-sm font-medium text-[#13294b]">{picked.length} selected · {totalMins} min · ${totalPrice}{gapMin > 0 ? ` · ${gapMin} min processing gap` : ""}</p>
+                    <p className="mt-2 text-sm font-medium text-[#13294b]">{picked.length} selected · {totalMins} min · ${totalPrice}{gapMin > 0 ? ` · ${gapMin} min processing gap` : ""}{isClass ? ` · class of ${classCap}` : ""}</p>
                   )}
                 </>
               )}
@@ -254,12 +278,12 @@ export default function AddBooking() {
                   <p className="text-sm text-slate-500">No open slots that day for a {totalMins}-minute appointment.</p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
-                    {slots.map((m) => (
+                    {slots.map((m) => { const left = isClass ? classCap - (spotsTaken[m] || 0) : null; return (
                       <button key={m} onClick={() => setSlot(m)}
                         className={`rounded-xl px-3 py-2 text-sm font-medium ring-1 ${slot === m ? "bg-[#13294b] text-white ring-[#13294b]" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}>
-                        {toLabel(m)}
+                        <div>{toLabel(m)}</div>{isClass && <div className={`text-[10px] ${slot === m ? "text-white/70" : "text-slate-500"}`}>{left} left</div>}
                       </button>
-                    ))}
+                    ); })}
                   </div>
                 )}
               </div>
