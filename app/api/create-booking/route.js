@@ -50,6 +50,7 @@ export async function POST(req) {
         custom_answers: b.custom_answers || [],
         gap_after_min: b.gap_after_min || 0,
         gap_min: b.gap_min || 0,
+        capacity: b.capacity || 1,
       })
       .select("id")
       .single();
