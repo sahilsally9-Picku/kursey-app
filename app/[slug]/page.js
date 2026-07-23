@@ -19,8 +19,8 @@ function upcomingDates(barber) {
   return out;
 }
 function breakBlocks(barber) { return (barber.breaks || []).map((b) => { const [s, e] = b.split("-"); return { s: toMin(s), e: toMin(e) }; }); }
-function tightSlots(barber, service, bookings) {
-  const dur = service?.mins || 30; const open = toMin(barber.start_time || "09:00"), close = toMin(barber.end_time || "17:00");
+function tightSlots(barber, durMin, bookings) {
+  const dur = durMin || 30; const open = toMin(barber.start_time || "09:00"), close = toMin(barber.end_time || "17:00");
   const busy = [...(bookings || []).filter((b) => b.start_min != null).map((b) => ({ s: b.start_min, e: b.start_min + (b.duration_min || 30) })), ...breakBlocks(barber)].sort((a, b) => a.s - b.s);
   const out = []; let cur = open, g = 0;
   while (cur + dur <= close && g < 300) { g++; const hit = busy.find((b) => overlaps(cur, cur + dur, b.s, b.e)); if (hit) { cur = hit.e; continue; } out.push(cur); cur += dur; }
@@ -73,7 +73,7 @@ export default function ShopBooking() {
   const [showHistory, setShowHistory] = useState(false); const [history, setHistory] = useState([]);
   const [reviewFor, setReviewFor] = useState(null); const [rStars, setRStars] = useState(5); const [rComment, setRComment] = useState(""); const [savingReview, setSavingReview] = useState(false);
   const [step, setStep] = useState("service");
-  const [service, setService] = useState(null); const [barber, setBarber] = useState(null);
+  const [picked, setPicked] = useState([]); const [barber, setBarber] = useState(null);
   const [date, setDate] = useState(null); const [slot, setSlot] = useState(null);
   const [dayBookings, setDayBookings] = useState([]); const [loadingSlots, setLoadingSlots] = useState(false);
   const [name, setName] = useState(""); const [phone, setPhone] = useState(""); const [email, setEmail] = useState("");
@@ -155,22 +155,26 @@ export default function ShopBooking() {
     setReviewFor(null); setRStars(5); setRComment(""); setSavingReview(false);
   }
 
-  const reset = () => { setStep("service"); setService(null); setBarber(null); setDate(null); setSlot(null); setDayBookings([]); if (!customer) { setName(""); setPhone(""); setEmail(""); } setOffers(false); setClientSecret(null); setStripeForAccount(null); };
+  const reset = () => { setStep("service"); setPicked([]); setBarber(null); setDate(null); setSlot(null); setDayBookings([]); if (!customer) { setName(""); setPhone(""); setEmail(""); } setOffers(false); setClientSecret(null); setStripeForAccount(null); };
   const dates = barber ? upcomingDates(barber) : [];
-  const availableSlots = (barber && service && date) ? tightSlots(barber, service, dayBookings) : [];
+  const totalMins = picked.reduce((n, s) => n + (s.mins || 30), 0);
+  const totalPrice = picked.reduce((n, s) => n + (s.price || 0), 0);
+  const serviceNames = picked.map((s) => s.name).join(" + ");
+  const availableSlots = (barber && picked.length > 0 && date) ? tightSlots(barber, totalMins, dayBookings) : [];
+  function toggleService(s) { setPicked((prev) => prev.some((p) => p.id === s.id) ? prev.filter((p) => p.id !== s.id) : [...prev, s]); setSlot(null); }
   const input = "w-full rounded-xl bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-1 ring-slate-300 placeholder:text-slate-400 focus:ring-[#13294b]";
   const t = terms(shop?.business_type);
 
   async function saveBooking(depositPaid, paymentIntentId) {
     setSaving(true);
-    const dur = service.mins || 30;
+    const dur = totalMins || 30;
     const { data: fresh } = await supabase.rpc("busy_times", { p_shop_id: shop.id, p_barber: barber.name, p_date: date.key });
     const clash = (fresh || []).some((b) => b.start_min != null && overlaps(slot, slot + dur, b.start_min, b.start_min + (b.duration_min || 30)));
     if (clash) { setSaving(false); alert("Sorry, that time was just taken."); setStep("time"); setSlot(null); setClientSecret(null); return false; }
     const _bkRes = await fetch("/api/create-booking", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        shop_id: shop.id, service: service.name, price: service.price, barber: barber.name,
+        shop_id: shop.id, service: serviceNames, price: totalPrice, barber: barber.name,
         day: `${date.label} ${date.sub}`, slot: toLabel(slot),
         booking_date: date.key, start_min: slot, duration_min: dur,
         customer_name: name, phone: phone, email: email, wants_offers: offers,
@@ -317,7 +321,30 @@ export default function ShopBooking() {
           </div>
         )}
 
-        {step === "service" && (<><h2 className="mt-6 mb-3 text-lg font-semibold">Choose a service</h2>{services.length === 0 ? <p className="rounded-xl bg-white p-4 text-slate-500 ring-1 ring-slate-200">This shop hasn't added services yet.</p> : <div className="space-y-2">{services.map((s) => (<button key={s.id} onClick={() => { setService(s); setStep("barber"); }} className="flex w-full items-start justify-between rounded-xl bg-white p-4 text-left ring-1 ring-slate-200 transition hover:ring-[#13294b]"><div className="pr-3"><div className="font-medium">{s.name}</div><div className="text-sm text-slate-500">{s.mins} min</div>{s.description && <div className="mt-1 text-sm text-slate-400">{s.description}</div>}</div><div className="shrink-0 text-lg font-semibold">${s.price}</div></button>))}</div>}</>)}
+        {step === "service" && (<>
+          <h2 className="mt-6 mb-1 text-lg font-semibold">Choose your service</h2>
+          <p className="mb-3 text-sm text-slate-500">Pick one, or add a few to book them together.</p>
+          {services.length === 0 ? <p className="rounded-xl bg-white p-4 text-slate-500 ring-1 ring-slate-200">This shop hasn't added services yet.</p> : (<>
+            <div className="space-y-2">{services.map((s) => {
+              const on = picked.some((p) => p.id === s.id);
+              return (
+                <button key={s.id} onClick={() => toggleService(s)} className={`flex w-full items-start justify-between rounded-xl bg-white p-4 text-left transition ${on ? "ring-2 ring-[#13294b]" : "ring-1 ring-slate-200 hover:ring-[#13294b]"}`}>
+                  <div className="flex items-start gap-3 pr-3">
+                    <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded border text-xs text-white ${on ? "border-[#13294b] bg-[#13294b]" : "border-slate-300"}`}>{on ? "✓" : ""}</span>
+                    <div><div className="font-medium">{s.name}</div><div className="text-sm text-slate-500">{s.mins} min</div>{s.description && <div className="mt-1 text-sm text-slate-400">{s.description}</div>}</div>
+                  </div>
+                  <div className="shrink-0 text-lg font-semibold">${s.price}</div>
+                </button>
+              );
+            })}</div>
+            {picked.length > 0 && (
+              <div className="sticky bottom-4 mt-4 rounded-2xl bg-white p-4 shadow-lg ring-1 ring-slate-200">
+                <div className="flex items-center justify-between"><span className="text-sm text-slate-500">{picked.length} service{picked.length === 1 ? "" : "s"} · {totalMins} min</span><span className="text-lg font-bold">${totalPrice}</span></div>
+                <button onClick={() => setStep("barber")} className="mt-2 w-full rounded-xl bg-[#13294b] py-3 font-semibold text-white transition hover:bg-[#1d3a63]">Continue</button>
+              </div>
+            )}
+          </>)}
+        </>)}
 
         {step === "barber" && (<><button onClick={() => setStep("service")} className="mt-6 text-sm font-medium text-slate-500">← Back</button><h2 className="mt-2 mb-1 text-lg font-semibold">Pick your {t.staff}</h2>{staff.length === 0 ? <p className="mt-3 rounded-xl bg-white p-4 text-slate-500 ring-1 ring-slate-200">This shop hasn't added {t.staffPlural} yet.</p> : <div className="space-y-3">{staff.map((b) => {
           const avg = avgRating(b.name); const brevs = reviewsFor(b.name);
@@ -339,9 +366,9 @@ export default function ShopBooking() {
           );
         })}</div>}</>)}
 
-        {step === "time" && (<><button onClick={() => { setStep("barber"); setDate(null); setSlot(null); }} className="mt-6 text-sm font-medium text-slate-500">← Back</button><h2 className="mt-2 mb-1 text-lg font-semibold">Pick a day &amp; time with {barber.name}</h2><p className="mb-3 text-sm text-slate-500">{service.name} · {service.mins} min</p>{dates.length === 0 ? <p className="mt-3 rounded-xl bg-white p-4 text-slate-500 ring-1 ring-slate-200">No working days set for this {t.staff}.</p> : <><div className="mb-3 flex gap-2 overflow-x-auto pb-1">{dates.map((d) => (<button key={d.key} onClick={() => { setDate(d); setSlot(null); }} className={`min-w-[68px] shrink-0 rounded-xl px-2 py-2 text-center ring-1 transition ${date?.key === d.key ? "bg-[#13294b] text-white ring-[#13294b]" : "bg-white text-slate-700 ring-slate-200"}`}><div className="text-sm font-semibold">{d.label}</div><div className={`text-xs ${date?.key === d.key ? "text-white/70" : "text-slate-400"}`}>{d.sub}</div></button>))}</div>{!date ? <p className="text-sm text-slate-400">Pick a day above.</p> : loadingSlots ? <p className="text-sm text-slate-400">Checking…</p> : availableSlots.length === 0 ? <p className="rounded-xl bg-white p-4 text-slate-500 ring-1 ring-slate-200">Fully booked — try another day.</p> : <div className="grid grid-cols-3 gap-2">{availableSlots.map((m) => (<button key={m} onClick={() => setSlot(m)} className={`rounded-xl py-2.5 text-sm font-medium ring-1 transition ${slot === m ? "bg-[#13294b] text-white ring-[#13294b]" : "bg-white text-slate-800 ring-slate-200 hover:ring-[#13294b]"}`}>{toLabel(m)}</button>))}</div>}</>}<button disabled={slot === null || !date} onClick={() => setStep("details")} className="mt-4 w-full rounded-xl bg-[#13294b] py-3 font-semibold text-white transition enabled:hover:bg-[#1d3a63] disabled:opacity-40">Continue</button></>)}
+        {step === "time" && (<><button onClick={() => { setStep("barber"); setDate(null); setSlot(null); }} className="mt-6 text-sm font-medium text-slate-500">← Back</button><h2 className="mt-2 mb-1 text-lg font-semibold">Pick a day &amp; time with {barber.name}</h2><p className="mb-3 text-sm text-slate-500">{serviceNames} · {totalMins} min</p>{dates.length === 0 ? <p className="mt-3 rounded-xl bg-white p-4 text-slate-500 ring-1 ring-slate-200">No working days set for this {t.staff}.</p> : <><div className="mb-3 flex gap-2 overflow-x-auto pb-1">{dates.map((d) => (<button key={d.key} onClick={() => { setDate(d); setSlot(null); }} className={`min-w-[68px] shrink-0 rounded-xl px-2 py-2 text-center ring-1 transition ${date?.key === d.key ? "bg-[#13294b] text-white ring-[#13294b]" : "bg-white text-slate-700 ring-slate-200"}`}><div className="text-sm font-semibold">{d.label}</div><div className={`text-xs ${date?.key === d.key ? "text-white/70" : "text-slate-400"}`}>{d.sub}</div></button>))}</div>{!date ? <p className="text-sm text-slate-400">Pick a day above.</p> : loadingSlots ? <p className="text-sm text-slate-400">Checking…</p> : availableSlots.length === 0 ? <p className="rounded-xl bg-white p-4 text-slate-500 ring-1 ring-slate-200">Fully booked — try another day.</p> : <div className="grid grid-cols-3 gap-2">{availableSlots.map((m) => (<button key={m} onClick={() => setSlot(m)} className={`rounded-xl py-2.5 text-sm font-medium ring-1 transition ${slot === m ? "bg-[#13294b] text-white ring-[#13294b]" : "bg-white text-slate-800 ring-slate-200 hover:ring-[#13294b]"}`}>{toLabel(m)}</button>))}</div>}</>}<button disabled={slot === null || !date} onClick={() => setStep("details")} className="mt-4 w-full rounded-xl bg-[#13294b] py-3 font-semibold text-white transition enabled:hover:bg-[#1d3a63] disabled:opacity-40">Continue</button></>)}
 
-        {step === "details" && (<><button onClick={() => setStep("time")} className="mt-6 text-sm font-medium text-slate-500">← Back</button><h2 className="mt-2 mb-3 text-lg font-semibold">Your details</h2><div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><div className="flex justify-between text-sm"><span className="text-slate-400">Service</span><span className="font-medium">{service.name} · ${service.price}</span></div><div className="mt-1 flex justify-between text-sm"><span className="text-slate-400">{cap(t.staff)}</span><span className="font-medium">{barber.name}</span></div><div className="mt-1 flex justify-between text-sm"><span className="text-slate-400">When</span><span className="font-medium">{date.label} {date.sub} at {toLabel(slot)}</span></div>{shop.deposits_enabled && shop.stripe_account_id && <div className="mt-1 flex justify-between text-sm"><span className="text-slate-400">Deposit</span><span className="font-medium text-[#1d3a63]">${shop.deposit_amount} to confirm</span></div>}</div><div className="mt-3 space-y-2"><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className={input} /><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Mobile number" className={input} /><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (for your confirmation)" className={input} /></div><button onClick={() => setOffers(!offers)} className="mt-2 flex w-full items-start gap-2 rounded-xl bg-white p-3 text-left text-sm ring-1 ring-slate-200"><span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded border text-white ${offers ? "border-[#13294b] bg-[#13294b]" : "border-slate-300"}`}>{offers ? "✓" : ""}</span><span className="text-slate-600">Email me offers &amp; news <span className="text-slate-400">— optional</span></span></button><button disabled={!name || !phone || saving || preparingPayment} onClick={handleConfirm} className="mt-3 w-full rounded-xl bg-[#13294b] py-3 font-semibold text-white transition enabled:hover:bg-[#1d3a63] disabled:opacity-40">{preparingPayment ? "Preparing…" : saving ? "Booking…" : shop.deposits_enabled && shop.stripe_account_id ? `Continue to deposit ($${shop.deposit_amount})` : "Confirm booking"}</button></>)}
+        {step === "details" && (<><button onClick={() => setStep("time")} className="mt-6 text-sm font-medium text-slate-500">← Back</button><h2 className="mt-2 mb-3 text-lg font-semibold">Your details</h2><div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><div className="flex justify-between text-sm"><span className="text-slate-400">Service{picked.length > 1 ? "s" : ""}</span><span className="font-medium text-right">{serviceNames} · ${totalPrice}</span></div><div className="mt-1 flex justify-between text-sm"><span className="text-slate-400">{cap(t.staff)}</span><span className="font-medium">{barber.name}</span></div><div className="mt-1 flex justify-between text-sm"><span className="text-slate-400">When</span><span className="font-medium">{date.label} {date.sub} at {toLabel(slot)}</span></div>{shop.deposits_enabled && shop.stripe_account_id && <div className="mt-1 flex justify-between text-sm"><span className="text-slate-400">Deposit</span><span className="font-medium text-[#1d3a63]">${shop.deposit_amount} to confirm</span></div>}</div><div className="mt-3 space-y-2"><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className={input} /><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Mobile number" className={input} /><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (for your confirmation)" className={input} /></div><button onClick={() => setOffers(!offers)} className="mt-2 flex w-full items-start gap-2 rounded-xl bg-white p-3 text-left text-sm ring-1 ring-slate-200"><span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded border text-white ${offers ? "border-[#13294b] bg-[#13294b]" : "border-slate-300"}`}>{offers ? "✓" : ""}</span><span className="text-slate-600">Email me offers &amp; news <span className="text-slate-400">— optional</span></span></button><button disabled={!name || !phone || saving || preparingPayment} onClick={handleConfirm} className="mt-3 w-full rounded-xl bg-[#13294b] py-3 font-semibold text-white transition enabled:hover:bg-[#1d3a63] disabled:opacity-40">{preparingPayment ? "Preparing…" : saving ? "Booking…" : shop.deposits_enabled && shop.stripe_account_id ? `Continue to deposit ($${shop.deposit_amount})` : "Confirm booking"}</button></>)}
 
         {step === "pay" && clientSecret && stripeForAccount && (
           <>
@@ -356,7 +383,7 @@ export default function ShopBooking() {
           </>
         )}
 
-        {step === "done" && (<div className="mt-6 rounded-2xl bg-white p-6 text-center ring-1 ring-slate-200"><div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full bg-[#13294b]/10 text-2xl text-[#1d3a63]">✓</div><h2 className="text-xl font-bold">You&apos;re booked, {name}!</h2><p className="mt-1 text-slate-600"><span className="font-semibold">{service.name}</span> with <span className="font-semibold">{barber.name}</span></p><p className="mt-1 text-slate-600">{date.label} {date.sub} at {toLabel(slot)}</p>{shop.deposits_enabled && shop.stripe_account_id && <p className="mt-1 text-sm text-[#1d3a63]">Deposit of ${shop.deposit_amount} paid ✓</p>}{email && <p className="mt-2 text-sm text-slate-400">A confirmation has been sent to {email}.</p>}<button onClick={reset} className="mt-4 block w-full text-sm font-medium text-[#1d3a63] underline">Book another</button></div>)}
+        {step === "done" && (<div className="mt-6 rounded-2xl bg-white p-6 text-center ring-1 ring-slate-200"><div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full bg-[#13294b]/10 text-2xl text-[#1d3a63]">✓</div><h2 className="text-xl font-bold">You&apos;re booked, {name}!</h2><p className="mt-1 text-slate-600"><span className="font-semibold">{serviceNames}</span> with <span className="font-semibold">{barber.name}</span></p><p className="mt-1 text-slate-600">{date.label} {date.sub} at {toLabel(slot)}</p>{shop.deposits_enabled && shop.stripe_account_id && <p className="mt-1 text-sm text-[#1d3a63]">Deposit of ${shop.deposit_amount} paid ✓</p>}{email && <p className="mt-2 text-sm text-slate-400">A confirmation has been sent to {email}.</p>}<button onClick={reset} className="mt-4 block w-full text-sm font-medium text-[#1d3a63] underline">Book another</button></div>)}
       </div>
     </div>
   );
