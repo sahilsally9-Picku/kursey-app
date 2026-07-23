@@ -63,6 +63,8 @@ export default function AddBooking() {
   const [doneInfo, setDoneInfo] = useState(null);
   const [error, setError] = useState("");
   const [classSpots, setClassSpots] = useState([]);
+  const [repeat, setRepeat] = useState("none");
+  const [times, setTimes] = useState(4);
 
   const router = useRouter();
 
@@ -127,44 +129,64 @@ export default function AddBooking() {
 
     setSaving(true);
     const dur = totalMins || 30;
-    const { data: fresh } = await supabase.rpc("busy_times", { p_shop_id: shop.id, p_barber: barber.name, p_date: date.key });
-    let joiningClass = false;
-    if (isClass) {
-      const { data: freshSpots } = await supabase.rpc("class_spots", { p_shop_id: shop.id, p_barber: barber.name, p_date: date.key, p_service: soloName });
-      const row = (freshSpots || []).find((cs) => cs.start_min === slot);
-      const takenNow = row ? Number(row.taken) : 0;
-      if (takenNow >= classCap) { setSaving(false); setError("That class just filled up — please pick another time."); setSlot(null); return; }
-      joiningClass = takenNow > 0;
-    }
     const myBlocks = activeBlocks(dur, gapAfter, gapMin);
-    const clash = !joiningClass && (fresh || []).some((b) => b.start_min != null && myBlocks.some((bl) => overlaps(slot + bl.o, slot + bl.o + bl.l, b.start_min, b.start_min + (b.duration_min || 30))));
-    if (clash) { setSaving(false); setError("That time was just taken — please pick another."); setSlot(null); return; }
+    const intervalDays = repeat === "weekly" ? 7 : repeat === "biweekly" ? 14 : repeat === "monthly" ? 28 : 0;
+    const howMany = repeat === "none" ? 1 : Math.max(2, Math.min(12, parseInt(times) || 2));
+    const seriesId = howMany > 1 ? (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)) : null;
 
-    const res = await fetch("/api/create-booking", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        shop_id: shop.id, service: serviceNames, price: totalPrice, barber: barber.name,
-        day: `${date.label} ${date.sub}`, slot: toLabel(slot),
-        booking_date: date.key, start_min: slot, duration_min: dur,
-        customer_name: name, phone: phone, email: email, wants_offers: false,
-        customer_user_id: null, deposit_paid: false, deposit_amount: 0,
-        stripe_payment_intent: null, status: "confirmed",
-        gap_after_min: gapAfter, gap_min: gapMin, capacity: classCap,
-      }),
-    });
-    const json = await res.json().catch(() => ({}));
-    setSaving(false);
-    if (!res.ok || json.error) { setError("Couldn't save: " + (json.error || "please try again")); return; }
-    if (json.booking?.id && email) {
-      fetch("/api/send-confirmation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bookingId: json.booking.id }) }).catch(() => {});
+    const madeDates = []; const skippedDates = [];
+    for (let i = 0; i < howMany; i++) {
+      const d = new Date(date.key + "T00:00:00");
+      d.setDate(d.getDate() + i * intervalDays);
+      const key = d.toISOString().slice(0, 10);
+      const dayText = i === 0 ? `${date.label} ${date.sub}` : `${DAY_NAMES[d.getDay()]} ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+      const niceDate = `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+
+      let joiningClass = false;
+      if (isClass) {
+        const { data: freshSpots } = await supabase.rpc("class_spots", { p_shop_id: shop.id, p_barber: barber.name, p_date: key, p_service: soloName });
+        const row = (freshSpots || []).find((cs) => cs.start_min === slot);
+        const takenNow = row ? Number(row.taken) : 0;
+        if (takenNow >= classCap) { skippedDates.push(niceDate); continue; }
+        joiningClass = takenNow > 0;
+      }
+      const { data: fresh } = await supabase.rpc("busy_times", { p_shop_id: shop.id, p_barber: barber.name, p_date: key });
+      const clash = !joiningClass && (fresh || []).some((b) => b.start_min != null && myBlocks.some((bl) => overlaps(slot + bl.o, slot + bl.o + bl.l, b.start_min, b.start_min + (b.duration_min || 30))));
+      if (clash) { skippedDates.push(niceDate); continue; }
+
+      const res = await fetch("/api/create-booking", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          shop_id: shop.id, service: serviceNames, price: totalPrice, barber: barber.name,
+          day: dayText, slot: toLabel(slot),
+          booking_date: key, start_min: slot, duration_min: dur,
+          customer_name: name, phone: phone, email: email, wants_offers: false,
+          customer_user_id: null, deposit_paid: false, deposit_amount: 0,
+          stripe_payment_intent: null, status: "confirmed",
+          gap_after_min: gapAfter, gap_min: gapMin, capacity: classCap,
+          series_id: seriesId,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json.error) { skippedDates.push(niceDate); continue; }
+      madeDates.push(niceDate);
+      if (json.booking?.id && email) {
+        fetch("/api/send-confirmation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bookingId: json.booking.id }) }).catch(() => {});
+      }
     }
-    setDoneInfo({ name, services: serviceNames, barber: barber.name, when: `${date.label} ${date.sub} at ${toLabel(slot)}` });
+
+    setSaving(false);
+    if (madeDates.length === 0) {
+      setError(howMany > 1 ? "None of those dates were free — try another time." : "That time was just taken — please pick another.");
+      setSlot(null); return;
+    }
+    setDoneInfo({ name, services: serviceNames, barber: barber.name, at: toLabel(slot), made: madeDates, skipped: skippedDates });
     setDone(true);
   }
 
   function addAnother() {
     setDone(false); setDoneInfo(null); setName(""); setPhone(""); setEmail("");
-    setPicked([]); setBarber(null); setDate(null); setSlot(null); setDayBookings([]); setError("");
+    setPicked([]); setBarber(null); setDate(null); setSlot(null); setDayBookings([]); setError(""); setRepeat("none"); setTimes(4);
   }
 
   if (checking) return <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500">Loading…</div>;
@@ -191,7 +213,8 @@ export default function AddBooking() {
           <div className={`mt-6 p-6 text-center ${card}`}>
             <div className="font-display text-xl font-semibold text-[#13294b]">Booking added ✓</div>
             <p className="mt-1 text-sm text-slate-600">{doneInfo.name} · {doneInfo.services} with {doneInfo.barber}</p>
-            <p className="text-sm text-slate-600">{doneInfo.when}</p>
+            <p className="text-sm text-slate-600">{doneInfo.made.length === 1 ? `${doneInfo.made[0]} at ${doneInfo.at}` : `${doneInfo.made.length} appointments at ${doneInfo.at} — ${doneInfo.made.join(", ")}`}</p>
+            {doneInfo.skipped.length > 0 && <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200">Skipped (already booked): {doneInfo.skipped.join(", ")}</p>}
             <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
               <button onClick={addAnother} className="rounded-xl bg-[#13294b] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#1d3a63]">Add another</button>
               <a href="/dashboard" className="rounded-xl border border-slate-300 px-5 py-2.5 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50">Back to dashboard</a>
@@ -289,11 +312,29 @@ export default function AddBooking() {
               </div>
             )}
 
+            {barber && picked.length > 0 && date && slot != null && (
+              <div>
+                <label className={label}>Repeat</label>
+                <div className="flex flex-wrap gap-2">
+                  {[["none", "Just once"], ["weekly", "Every week"], ["biweekly", "Every 2 weeks"], ["monthly", "Every 4 weeks"]].map(([v, lbl]) => (
+                    <button key={v} onClick={() => setRepeat(v)} className={`rounded-xl px-3 py-2 text-sm font-medium ring-1 ${repeat === v ? "bg-[#13294b] text-white ring-[#13294b]" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}>{lbl}</button>
+                  ))}
+                </div>
+                {repeat !== "none" && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-sm text-slate-600">How many times?</span>
+                    <input value={times} onChange={(e) => setTimes(e.target.value)} type="number" min="2" max="12" className={`${input} w-24`} />
+                  </div>
+                )}
+                {repeat !== "none" && <p className="mt-1 text-xs text-slate-500">Any date that's already booked will be skipped and shown to you.</p>}
+              </div>
+            )}
+
             {error && <p className="text-sm text-red-600">{error}</p>}
 
             <button onClick={save} disabled={saving}
               className="w-full rounded-xl bg-[#13294b] py-3 font-semibold text-white shadow-sm transition enabled:hover:bg-[#1d3a63] disabled:opacity-40">
-              {saving ? "Saving…" : "Add booking"}
+              {saving ? "Saving…" : repeat === "none" ? "Add booking" : `Add ${Math.max(2, Math.min(12, parseInt(times) || 2))} bookings`}
             </button>
           </div>
         )}

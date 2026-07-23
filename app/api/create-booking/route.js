@@ -51,6 +51,7 @@ export async function POST(req) {
         gap_after_min: b.gap_after_min || 0,
         gap_min: b.gap_min || 0,
         capacity: b.capacity || 1,
+        series_id: b.series_id || null,
       })
       .select("id")
       .single();
