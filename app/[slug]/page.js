@@ -19,11 +19,23 @@ function upcomingDates(barber) {
   return out;
 }
 function breakBlocks(barber) { return (barber.breaks || []).map((b) => { const [s, e] = b.split("-"); return { s: toMin(s), e: toMin(e) }; }); }
-function tightSlots(barber, durMin, bookings) {
+function activeBlocks(total, gapAfter, gapMin) {
+  const post = total - (gapAfter || 0) - (gapMin || 0);
+  if (!gapMin || !gapAfter || post <= 0) return [{ o: 0, l: total }];
+  return [{ o: 0, l: gapAfter }, { o: gapAfter + gapMin, l: post }];
+}
+function tightSlots(barber, durMin, gapAfter, gapMin, bookings) {
   const dur = durMin || 30; const open = toMin(barber.start_time || "09:00"), close = toMin(barber.end_time || "17:00");
+  const blocks = activeBlocks(dur, gapAfter, gapMin);
   const busy = [...(bookings || []).filter((b) => b.start_min != null).map((b) => ({ s: b.start_min, e: b.start_min + (b.duration_min || 30) })), ...breakBlocks(barber)].sort((a, b) => a.s - b.s);
   const out = []; let cur = open, g = 0;
-  while (cur + dur <= close && g < 300) { g++; const hit = busy.find((b) => overlaps(cur, cur + dur, b.s, b.e)); if (hit) { cur = hit.e; continue; } out.push(cur); cur += dur; }
+  while (cur + dur <= close && g < 400) {
+    g++;
+    let advance = null;
+    for (const bl of blocks) { const hit = busy.find((b) => overlaps(cur + bl.o, cur + bl.o + bl.l, b.s, b.e)); if (hit) { advance = Math.max(cur + 5, hit.e - bl.o); break; } }
+    if (advance !== null) { cur = advance; continue; }
+    out.push(cur); cur += dur;
+  }
   return out;
 }
 function Stars({ value, size = "text-base" }) {
@@ -161,7 +173,10 @@ export default function ShopBooking() {
   const totalMins = picked.reduce((n, s) => n + (s.mins || 30), 0);
   const totalPrice = picked.reduce((n, s) => n + (s.price || 0), 0);
   const serviceNames = picked.map((s) => s.name).join(" + ");
-  const availableSlots = (barber && picked.length > 0 && date) ? tightSlots(barber, totalMins, dayBookings) : [];
+  const soloService = picked.length === 1 ? picked[0] : null;
+  const gapAfter = soloService ? (soloService.gap_after_min || 0) : 0;
+  const gapMin = soloService ? (soloService.gap_min || 0) : 0;
+  const availableSlots = (barber && picked.length > 0 && date) ? tightSlots(barber, totalMins, gapAfter, gapMin, dayBookings) : [];
   function toggleService(s) { setPicked((prev) => prev.some((p) => p.id === s.id) ? prev.filter((p) => p.id !== s.id) : [...prev, s]); setSlot(null); }
   const input = "w-full rounded-xl bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-1 ring-slate-300 placeholder:text-slate-400 focus:ring-[#13294b]";
   const t = terms(shop?.business_type);
@@ -171,7 +186,8 @@ export default function ShopBooking() {
     setSaving(true);
     const dur = totalMins || 30;
     const { data: fresh } = await supabase.rpc("busy_times", { p_shop_id: shop.id, p_barber: barber.name, p_date: date.key });
-    const clash = (fresh || []).some((b) => b.start_min != null && overlaps(slot, slot + dur, b.start_min, b.start_min + (b.duration_min || 30)));
+    const myBlocks = activeBlocks(dur, gapAfter, gapMin);
+    const clash = (fresh || []).some((b) => b.start_min != null && myBlocks.some((bl) => overlaps(slot + bl.o, slot + bl.o + bl.l, b.start_min, b.start_min + (b.duration_min || 30))));
     if (clash) { setSaving(false); alert("Sorry, that time was just taken."); setStep("time"); setSlot(null); setClientSecret(null); return false; }
     const _bkRes = await fetch("/api/create-booking", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -186,6 +202,7 @@ export default function ShopBooking() {
         stripe_payment_intent: paymentIntentId || null,
         status: "confirmed",
         custom_answers: questions.map((q, i) => ({ q: q.label, a: (answers[i] || "").trim() })).filter((x) => x.a),
+        gap_after_min: gapAfter, gap_min: gapMin,
       }),
     });
     const _bkJson = await _bkRes.json().catch(() => ({}));
@@ -371,7 +388,7 @@ export default function ShopBooking() {
           );
         })}</div>}</>)}
 
-        {step === "time" && (<><button onClick={() => { setStep("barber"); setDate(null); setSlot(null); }} className="mt-6 text-sm font-medium text-slate-500">← Back</button><h2 className="mt-2 mb-1 text-lg font-semibold">Pick a day &amp; time with {barber.name}</h2><p className="mb-3 text-sm text-slate-500">{serviceNames} · {totalMins} min</p>{dates.length === 0 ? <p className="mt-3 rounded-xl bg-white p-4 text-slate-500 ring-1 ring-slate-200">No working days set for this {t.staff}.</p> : <><div className="mb-3 flex gap-2 overflow-x-auto pb-1">{dates.map((d) => (<button key={d.key} onClick={() => { setDate(d); setSlot(null); }} className={`min-w-[68px] shrink-0 rounded-xl px-2 py-2 text-center ring-1 transition ${date?.key === d.key ? "bg-[#13294b] text-white ring-[#13294b]" : "bg-white text-slate-700 ring-slate-200"}`}><div className="text-sm font-semibold">{d.label}</div><div className={`text-xs ${date?.key === d.key ? "text-white/70" : "text-slate-400"}`}>{d.sub}</div></button>))}</div>{!date ? <p className="text-sm text-slate-400">Pick a day above.</p> : loadingSlots ? <p className="text-sm text-slate-400">Checking…</p> : availableSlots.length === 0 ? <p className="rounded-xl bg-white p-4 text-slate-500 ring-1 ring-slate-200">Fully booked — try another day.</p> : <div className="grid grid-cols-3 gap-2">{availableSlots.map((m) => (<button key={m} onClick={() => setSlot(m)} className={`rounded-xl py-2.5 text-sm font-medium ring-1 transition ${slot === m ? "bg-[#13294b] text-white ring-[#13294b]" : "bg-white text-slate-800 ring-slate-200 hover:ring-[#13294b]"}`}>{toLabel(m)}</button>))}</div>}</>}<button disabled={slot === null || !date} onClick={() => setStep("details")} className="mt-4 w-full rounded-xl bg-[#13294b] py-3 font-semibold text-white transition enabled:hover:bg-[#1d3a63] disabled:opacity-40">Continue</button></>)}
+        {step === "time" && (<><button onClick={() => { setStep("barber"); setDate(null); setSlot(null); }} className="mt-6 text-sm font-medium text-slate-500">← Back</button><h2 className="mt-2 mb-1 text-lg font-semibold">Pick a day &amp; time with {barber.name}</h2><p className="mb-3 text-sm text-slate-500">{serviceNames} · {totalMins} min{gapMin > 0 ? ` (includes ${gapMin} min processing)` : ""}</p>{dates.length === 0 ? <p className="mt-3 rounded-xl bg-white p-4 text-slate-500 ring-1 ring-slate-200">No working days set for this {t.staff}.</p> : <><div className="mb-3 flex gap-2 overflow-x-auto pb-1">{dates.map((d) => (<button key={d.key} onClick={() => { setDate(d); setSlot(null); }} className={`min-w-[68px] shrink-0 rounded-xl px-2 py-2 text-center ring-1 transition ${date?.key === d.key ? "bg-[#13294b] text-white ring-[#13294b]" : "bg-white text-slate-700 ring-slate-200"}`}><div className="text-sm font-semibold">{d.label}</div><div className={`text-xs ${date?.key === d.key ? "text-white/70" : "text-slate-400"}`}>{d.sub}</div></button>))}</div>{!date ? <p className="text-sm text-slate-400">Pick a day above.</p> : loadingSlots ? <p className="text-sm text-slate-400">Checking…</p> : availableSlots.length === 0 ? <p className="rounded-xl bg-white p-4 text-slate-500 ring-1 ring-slate-200">Fully booked — try another day.</p> : <div className="grid grid-cols-3 gap-2">{availableSlots.map((m) => (<button key={m} onClick={() => setSlot(m)} className={`rounded-xl py-2.5 text-sm font-medium ring-1 transition ${slot === m ? "bg-[#13294b] text-white ring-[#13294b]" : "bg-white text-slate-800 ring-slate-200 hover:ring-[#13294b]"}`}>{toLabel(m)}</button>))}</div>}</>}<button disabled={slot === null || !date} onClick={() => setStep("details")} className="mt-4 w-full rounded-xl bg-[#13294b] py-3 font-semibold text-white transition enabled:hover:bg-[#1d3a63] disabled:opacity-40">Continue</button></>)}
 
         {step === "details" && (<><button onClick={() => setStep("time")} className="mt-6 text-sm font-medium text-slate-500">← Back</button><h2 className="mt-2 mb-3 text-lg font-semibold">Your details</h2><div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><div className="flex justify-between text-sm"><span className="text-slate-400">Service{picked.length > 1 ? "s" : ""}</span><span className="font-medium text-right">{serviceNames} · ${totalPrice}</span></div><div className="mt-1 flex justify-between text-sm"><span className="text-slate-400">{cap(t.staff)}</span><span className="font-medium">{barber.name}</span></div><div className="mt-1 flex justify-between text-sm"><span className="text-slate-400">When</span><span className="font-medium">{date.label} {date.sub} at {toLabel(slot)}</span></div>{shop.deposits_enabled && shop.stripe_account_id && <div className="mt-1 flex justify-between text-sm"><span className="text-slate-400">Deposit</span><span className="font-medium text-[#1d3a63]">${shop.deposit_amount} to confirm</span></div>}</div><div className="mt-3 space-y-2"><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className={input} /><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Mobile number" className={input} /><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (for your confirmation)" className={input} /></div>{questions.length > 0 && (<div className="mt-3 space-y-2">{questions.map((q, i) => (<div key={i}><label className="mb-1 block text-sm font-medium text-slate-700">{q.label}{q.required && <span className="text-red-500"> *</span>}</label><input value={answers[i] || ""} onChange={(e) => setAnswers((prev) => ({ ...prev, [i]: e.target.value }))} placeholder="Your answer" className={input} /></div>))}</div>)}<button onClick={() => setOffers(!offers)} className="mt-2 flex w-full items-start gap-2 rounded-xl bg-white p-3 text-left text-sm ring-1 ring-slate-200"><span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded border text-white ${offers ? "border-[#13294b] bg-[#13294b]" : "border-slate-300"}`}>{offers ? "✓" : ""}</span><span className="text-slate-600">Email me offers &amp; news <span className="text-slate-400">— optional</span></span></button><button disabled={!name || !phone || saving || preparingPayment} onClick={handleConfirm} className="mt-3 w-full rounded-xl bg-[#13294b] py-3 font-semibold text-white transition enabled:hover:bg-[#1d3a63] disabled:opacity-40">{preparingPayment ? "Preparing…" : saving ? "Booking…" : shop.deposits_enabled && shop.stripe_account_id ? `Continue to deposit ($${shop.deposit_amount})` : "Confirm booking"}</button></>)}
 
