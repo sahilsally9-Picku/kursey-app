@@ -78,6 +78,7 @@ export default function ShopBooking() {
   const [dayBookings, setDayBookings] = useState([]); const [loadingSlots, setLoadingSlots] = useState(false);
   const [name, setName] = useState(""); const [phone, setPhone] = useState(""); const [email, setEmail] = useState("");
   const [offers, setOffers] = useState(false); const [saving, setSaving] = useState(false);
+  const [answers, setAnswers] = useState({});
   const [lightbox, setLightbox] = useState(null);
   const [clientSecret, setClientSecret] = useState(null);
   const [stripeForAccount, setStripeForAccount] = useState(null);
@@ -155,7 +156,7 @@ export default function ShopBooking() {
     setReviewFor(null); setRStars(5); setRComment(""); setSavingReview(false);
   }
 
-  const reset = () => { setStep("service"); setPicked([]); setBarber(null); setDate(null); setSlot(null); setDayBookings([]); if (!customer) { setName(""); setPhone(""); setEmail(""); } setOffers(false); setClientSecret(null); setStripeForAccount(null); };
+  const reset = () => { setStep("service"); setPicked([]); setBarber(null); setDate(null); setSlot(null); setDayBookings([]); if (!customer) { setName(""); setPhone(""); setEmail(""); } setOffers(false); setAnswers({}); setClientSecret(null); setStripeForAccount(null); };
   const dates = barber ? upcomingDates(barber) : [];
   const totalMins = picked.reduce((n, s) => n + (s.mins || 30), 0);
   const totalPrice = picked.reduce((n, s) => n + (s.price || 0), 0);
@@ -164,6 +165,7 @@ export default function ShopBooking() {
   function toggleService(s) { setPicked((prev) => prev.some((p) => p.id === s.id) ? prev.filter((p) => p.id !== s.id) : [...prev, s]); setSlot(null); }
   const input = "w-full rounded-xl bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-1 ring-slate-300 placeholder:text-slate-400 focus:ring-[#13294b]";
   const t = terms(shop?.business_type);
+  const questions = Array.isArray(shop?.booking_questions) ? shop.booking_questions : [];
 
   async function saveBooking(depositPaid, paymentIntentId) {
     setSaving(true);
@@ -183,6 +185,7 @@ export default function ShopBooking() {
         deposit_amount: depositPaid ? (shop.deposit_amount || 0) : 0,
         stripe_payment_intent: paymentIntentId || null,
         status: "confirmed",
+        custom_answers: questions.map((q, i) => ({ q: q.label, a: (answers[i] || "").trim() })).filter((x) => x.a),
       }),
     });
     const _bkJson = await _bkRes.json().catch(() => ({}));
@@ -200,6 +203,8 @@ export default function ShopBooking() {
   }
 
   async function handleConfirm() {
+    const missing = questions.findIndex((q, i) => q.required && !(answers[i] || "").trim());
+    if (missing !== -1) { alert(`Please answer: ${questions[missing].label}`); return; }
     if (shop.deposits_enabled && shop.stripe_account_id) {
       setPreparingPayment(true);
       try {
@@ -368,7 +373,7 @@ export default function ShopBooking() {
 
         {step === "time" && (<><button onClick={() => { setStep("barber"); setDate(null); setSlot(null); }} className="mt-6 text-sm font-medium text-slate-500">← Back</button><h2 className="mt-2 mb-1 text-lg font-semibold">Pick a day &amp; time with {barber.name}</h2><p className="mb-3 text-sm text-slate-500">{serviceNames} · {totalMins} min</p>{dates.length === 0 ? <p className="mt-3 rounded-xl bg-white p-4 text-slate-500 ring-1 ring-slate-200">No working days set for this {t.staff}.</p> : <><div className="mb-3 flex gap-2 overflow-x-auto pb-1">{dates.map((d) => (<button key={d.key} onClick={() => { setDate(d); setSlot(null); }} className={`min-w-[68px] shrink-0 rounded-xl px-2 py-2 text-center ring-1 transition ${date?.key === d.key ? "bg-[#13294b] text-white ring-[#13294b]" : "bg-white text-slate-700 ring-slate-200"}`}><div className="text-sm font-semibold">{d.label}</div><div className={`text-xs ${date?.key === d.key ? "text-white/70" : "text-slate-400"}`}>{d.sub}</div></button>))}</div>{!date ? <p className="text-sm text-slate-400">Pick a day above.</p> : loadingSlots ? <p className="text-sm text-slate-400">Checking…</p> : availableSlots.length === 0 ? <p className="rounded-xl bg-white p-4 text-slate-500 ring-1 ring-slate-200">Fully booked — try another day.</p> : <div className="grid grid-cols-3 gap-2">{availableSlots.map((m) => (<button key={m} onClick={() => setSlot(m)} className={`rounded-xl py-2.5 text-sm font-medium ring-1 transition ${slot === m ? "bg-[#13294b] text-white ring-[#13294b]" : "bg-white text-slate-800 ring-slate-200 hover:ring-[#13294b]"}`}>{toLabel(m)}</button>))}</div>}</>}<button disabled={slot === null || !date} onClick={() => setStep("details")} className="mt-4 w-full rounded-xl bg-[#13294b] py-3 font-semibold text-white transition enabled:hover:bg-[#1d3a63] disabled:opacity-40">Continue</button></>)}
 
-        {step === "details" && (<><button onClick={() => setStep("time")} className="mt-6 text-sm font-medium text-slate-500">← Back</button><h2 className="mt-2 mb-3 text-lg font-semibold">Your details</h2><div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><div className="flex justify-between text-sm"><span className="text-slate-400">Service{picked.length > 1 ? "s" : ""}</span><span className="font-medium text-right">{serviceNames} · ${totalPrice}</span></div><div className="mt-1 flex justify-between text-sm"><span className="text-slate-400">{cap(t.staff)}</span><span className="font-medium">{barber.name}</span></div><div className="mt-1 flex justify-between text-sm"><span className="text-slate-400">When</span><span className="font-medium">{date.label} {date.sub} at {toLabel(slot)}</span></div>{shop.deposits_enabled && shop.stripe_account_id && <div className="mt-1 flex justify-between text-sm"><span className="text-slate-400">Deposit</span><span className="font-medium text-[#1d3a63]">${shop.deposit_amount} to confirm</span></div>}</div><div className="mt-3 space-y-2"><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className={input} /><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Mobile number" className={input} /><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (for your confirmation)" className={input} /></div><button onClick={() => setOffers(!offers)} className="mt-2 flex w-full items-start gap-2 rounded-xl bg-white p-3 text-left text-sm ring-1 ring-slate-200"><span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded border text-white ${offers ? "border-[#13294b] bg-[#13294b]" : "border-slate-300"}`}>{offers ? "✓" : ""}</span><span className="text-slate-600">Email me offers &amp; news <span className="text-slate-400">— optional</span></span></button><button disabled={!name || !phone || saving || preparingPayment} onClick={handleConfirm} className="mt-3 w-full rounded-xl bg-[#13294b] py-3 font-semibold text-white transition enabled:hover:bg-[#1d3a63] disabled:opacity-40">{preparingPayment ? "Preparing…" : saving ? "Booking…" : shop.deposits_enabled && shop.stripe_account_id ? `Continue to deposit ($${shop.deposit_amount})` : "Confirm booking"}</button></>)}
+        {step === "details" && (<><button onClick={() => setStep("time")} className="mt-6 text-sm font-medium text-slate-500">← Back</button><h2 className="mt-2 mb-3 text-lg font-semibold">Your details</h2><div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><div className="flex justify-between text-sm"><span className="text-slate-400">Service{picked.length > 1 ? "s" : ""}</span><span className="font-medium text-right">{serviceNames} · ${totalPrice}</span></div><div className="mt-1 flex justify-between text-sm"><span className="text-slate-400">{cap(t.staff)}</span><span className="font-medium">{barber.name}</span></div><div className="mt-1 flex justify-between text-sm"><span className="text-slate-400">When</span><span className="font-medium">{date.label} {date.sub} at {toLabel(slot)}</span></div>{shop.deposits_enabled && shop.stripe_account_id && <div className="mt-1 flex justify-between text-sm"><span className="text-slate-400">Deposit</span><span className="font-medium text-[#1d3a63]">${shop.deposit_amount} to confirm</span></div>}</div><div className="mt-3 space-y-2"><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className={input} /><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Mobile number" className={input} /><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (for your confirmation)" className={input} /></div>{questions.length > 0 && (<div className="mt-3 space-y-2">{questions.map((q, i) => (<div key={i}><label className="mb-1 block text-sm font-medium text-slate-700">{q.label}{q.required && <span className="text-red-500"> *</span>}</label><input value={answers[i] || ""} onChange={(e) => setAnswers((prev) => ({ ...prev, [i]: e.target.value }))} placeholder="Your answer" className={input} /></div>))}</div>)}<button onClick={() => setOffers(!offers)} className="mt-2 flex w-full items-start gap-2 rounded-xl bg-white p-3 text-left text-sm ring-1 ring-slate-200"><span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded border text-white ${offers ? "border-[#13294b] bg-[#13294b]" : "border-slate-300"}`}>{offers ? "✓" : ""}</span><span className="text-slate-600">Email me offers &amp; news <span className="text-slate-400">— optional</span></span></button><button disabled={!name || !phone || saving || preparingPayment} onClick={handleConfirm} className="mt-3 w-full rounded-xl bg-[#13294b] py-3 font-semibold text-white transition enabled:hover:bg-[#1d3a63] disabled:opacity-40">{preparingPayment ? "Preparing…" : saving ? "Booking…" : shop.deposits_enabled && shop.stripe_account_id ? `Continue to deposit ($${shop.deposit_amount})` : "Confirm booking"}</button></>)}
 
         {step === "pay" && clientSecret && stripeForAccount && (
           <>

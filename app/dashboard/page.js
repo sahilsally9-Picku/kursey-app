@@ -225,6 +225,11 @@ export default function Dashboard() {
                     </div>
                     <div className="shrink-0 text-right"><div className="font-semibold">${b.price}</div><div className="text-xs text-slate-400">{b.phone}</div></div>
                   </div>
+                  {Array.isArray(b.custom_answers) && b.custom_answers.length > 0 && (
+                    <div className="mt-2 space-y-1 rounded-lg bg-slate-50 p-2 ring-1 ring-slate-200">
+                      {b.custom_answers.map((a, i) => (<div key={i} className="text-xs"><span className="text-slate-500">{a.q}</span> <span className="font-medium text-slate-800">{a.a}</span></div>))}
+                    </div>
+                  )}
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
                     {b.deposit_paid && <span className="inline-block rounded-full bg-[#13294b]/10 px-2 py-0.5 text-xs font-medium text-[#13294b] ring-1 ring-[#13294b]/20">Deposit paid ${b.deposit_amount} ✓</span>}
                     {b.wants_offers && <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">on offers list</span>}
