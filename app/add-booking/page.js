@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
+import { terms, cap } from "../../lib/terms";
 import { useRouter } from "next/navigation";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -20,8 +21,8 @@ function upcomingDates(barber) {
   return out;
 }
 function breakBlocks(barber) { return (barber.breaks || []).map((b) => { const [s, e] = b.split("-"); return { s: toMin(s), e: toMin(e) }; }); }
-function tightSlots(barber, service, dayBookings) {
-  const dur = service?.mins || 30;
+function tightSlots(barber, durMin, dayBookings) {
+  const dur = durMin || 30;
   const open = toMin(barber.start_time || "09:00"), close = toMin(barber.end_time || "17:00");
   const busy = [...(dayBookings || []).filter((b) => b.start_min != null).map((b) => ({ s: b.start_min, e: b.start_min + (b.duration_min || 30) })), ...breakBlocks(barber)].sort((a, b) => a.s - b.s);
   const out = []; let cur = open, g = 0;
@@ -38,7 +39,7 @@ export default function AddBooking() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [service, setService] = useState(null);
+  const [picked, setPicked] = useState([]);
   const [barber, setBarber] = useState(null);
   const [date, setDate] = useState(null);
   const [slot, setSlot] = useState(null);
@@ -47,6 +48,7 @@ export default function AddBooking() {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const [doneInfo, setDoneInfo] = useState(null);
   const [error, setError] = useState("");
 
   const router = useRouter();
@@ -59,8 +61,8 @@ export default function AddBooking() {
       if (!shopData) { router.replace("/signup"); return; }
       setShop(shopData);
       const [sv, st] = await Promise.all([
-        supabase.from("services").select("*").eq("shop_id", shopData.id),
-        supabase.from("staff").select("*").eq("shop_id", shopData.id),
+        supabase.from("services").select("*").eq("shop_id", shopData.id).order("created_at", { ascending: true }),
+        supabase.from("staff").select("*").eq("shop_id", shopData.id).order("created_at", { ascending: true }),
       ]);
       setServices(sv.data || []);
       setStaff(st.data || []);
@@ -79,19 +81,24 @@ export default function AddBooking() {
     loadDay();
   }, [barber, date, shop]);
 
-  function pickService(id) { const s = services.find((x) => String(x.id) === String(id)) || null; setService(s); setSlot(null); }
+  const totalMins = picked.reduce((n, s) => n + (s.mins || 30), 0);
+  const totalPrice = picked.reduce((n, s) => n + (s.price || 0), 0);
+  const serviceNames = picked.map((s) => s.name).join(" + ");
+  const t = terms(shop?.business_type);
+
+  function toggleService(s) { setPicked((prev) => prev.some((p) => p.id === s.id) ? prev.filter((p) => p.id !== s.id) : [...prev, s]); setSlot(null); }
   function pickBarber(id) { const b = staff.find((x) => String(x.id) === String(id)) || null; setBarber(b); setDate(null); setSlot(null); }
   function pickDate(d) { setDate(d); setSlot(null); }
 
   async function save() {
     setError("");
     if (!name.trim()) { setError("Please enter the customer's name."); return; }
-    if (!service) { setError("Please choose a service."); return; }
-    if (!barber) { setError("Please choose a staff member."); return; }
+    if (picked.length === 0) { setError("Please choose at least one service."); return; }
+    if (!barber) { setError(`Please choose a ${t.staff}.`); return; }
     if (!date || slot == null) { setError("Please choose a date and time."); return; }
 
     setSaving(true);
-    const dur = service.mins || 30;
+    const dur = totalMins || 30;
     const { data: fresh } = await supabase.rpc("busy_times", { p_shop_id: shop.id, p_barber: barber.name, p_date: date.key });
     const clash = (fresh || []).some((b) => b.start_min != null && overlaps(slot, slot + dur, b.start_min, b.start_min + (b.duration_min || 30)));
     if (clash) { setSaving(false); setError("That time was just taken — please pick another."); setSlot(null); return; }
@@ -99,7 +106,7 @@ export default function AddBooking() {
     const res = await fetch("/api/create-booking", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        shop_id: shop.id, service: service.name, price: service.price, barber: barber.name,
+        shop_id: shop.id, service: serviceNames, price: totalPrice, barber: barber.name,
         day: `${date.label} ${date.sub}`, slot: toLabel(slot),
         booking_date: date.key, start_min: slot, duration_min: dur,
         customer_name: name, phone: phone, email: email, wants_offers: false,
@@ -110,12 +117,16 @@ export default function AddBooking() {
     const json = await res.json().catch(() => ({}));
     setSaving(false);
     if (!res.ok || json.error) { setError("Couldn't save: " + (json.error || "please try again")); return; }
+    if (json.booking?.id && email) {
+      fetch("/api/send-confirmation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bookingId: json.booking.id }) }).catch(() => {});
+    }
+    setDoneInfo({ name, services: serviceNames, barber: barber.name, when: `${date.label} ${date.sub} at ${toLabel(slot)}` });
     setDone(true);
   }
 
   function addAnother() {
-    setDone(false); setName(""); setPhone(""); setEmail("");
-    setService(null); setBarber(null); setDate(null); setSlot(null); setDayBookings([]); setError("");
+    setDone(false); setDoneInfo(null); setName(""); setPhone(""); setEmail("");
+    setPicked([]); setBarber(null); setDate(null); setSlot(null); setDayBookings([]); setError("");
   }
 
   if (checking) return <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500">Loading…</div>;
@@ -124,7 +135,7 @@ export default function AddBooking() {
   const input = "w-full rounded-xl bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-1 ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-[#13294b]";
   const label = "mb-1 block text-sm font-medium text-slate-700";
   const dates = barber ? upcomingDates(barber) : [];
-  const slots = (barber && service && date) ? tightSlots(barber, service, dayBookings) : [];
+  const slots = (barber && picked.length > 0 && date) ? tightSlots(barber, totalMins, dayBookings) : [];
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -135,11 +146,11 @@ export default function AddBooking() {
         </div>
         <p className="mt-1 text-sm text-slate-500">For walk-ins or phone bookings.</p>
 
-        {done ? (
+        {done && doneInfo ? (
           <div className={`mt-6 p-6 text-center ${card}`}>
             <div className="font-display text-xl font-semibold text-[#13294b]">Booking added ✓</div>
-            <p className="mt-1 text-sm text-slate-600">{name} · {service?.name} with {barber?.name}</p>
-            <p className="text-sm text-slate-600">{date?.label} {date?.sub} at {slot != null ? toLabel(slot) : ""}</p>
+            <p className="mt-1 text-sm text-slate-600">{doneInfo.name} · {doneInfo.services} with {doneInfo.barber}</p>
+            <p className="text-sm text-slate-600">{doneInfo.when}</p>
             <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
               <button onClick={addAnother} className="rounded-xl bg-[#13294b] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#1d3a63]">Add another</button>
               <a href="/dashboard" className="rounded-xl border border-slate-300 px-5 py-2.5 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50">Back to dashboard</a>
@@ -161,24 +172,39 @@ export default function AddBooking() {
             </div>
 
             <div>
-              <label className={label}>Service</label>
+              <label className={label}>Service{picked.length > 1 ? "s" : ""} <span className="text-slate-400">— tap to select one or more</span></label>
               {services.length === 0 ? (
                 <p className="text-sm text-slate-500">No services yet. Add some in <a href="/settings" className="text-[#13294b] underline">Settings</a>.</p>
               ) : (
-                <select value={service?.id ?? ""} onChange={(e) => pickService(e.target.value)} className={input}>
-                  <option value="">Choose a service…</option>
-                  {services.map((s) => <option key={s.id} value={s.id}>{s.name} — ${s.price} · {s.mins || 30} min</option>)}
-                </select>
+                <>
+                  <div className="space-y-2">
+                    {services.map((s) => {
+                      const on = picked.some((p) => p.id === s.id);
+                      return (
+                        <button key={s.id} onClick={() => toggleService(s)} className={`flex w-full items-center justify-between rounded-xl bg-white px-4 py-3 text-left transition ${on ? "ring-2 ring-[#13294b]" : "ring-1 ring-slate-300 hover:ring-[#13294b]"}`}>
+                          <span className="flex items-center gap-3">
+                            <span className={`grid h-5 w-5 shrink-0 place-items-center rounded border text-xs text-white ${on ? "border-[#13294b] bg-[#13294b]" : "border-slate-300"}`}>{on ? "✓" : ""}</span>
+                            <span><span className="text-sm font-medium">{s.name}</span><span className="ml-2 text-xs text-slate-500">{s.mins || 30} min</span></span>
+                          </span>
+                          <span className="shrink-0 text-sm font-semibold">${s.price}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {picked.length > 0 && (
+                    <p className="mt-2 text-sm font-medium text-[#13294b]">{picked.length} selected · {totalMins} min · ${totalPrice}</p>
+                  )}
+                </>
               )}
             </div>
 
             <div>
-              <label className={label}>Staff member</label>
+              <label className={label}>{cap(t.staff)}</label>
               {staff.length === 0 ? (
-                <p className="text-sm text-slate-500">No staff yet. Add them in <a href="/settings" className="text-[#13294b] underline">Settings</a>.</p>
+                <p className="text-sm text-slate-500">No {t.staffPlural} yet. Add them in <a href="/settings" className="text-[#13294b] underline">Settings</a>.</p>
               ) : (
                 <select value={barber?.id ?? ""} onChange={(e) => pickBarber(e.target.value)} className={input}>
-                  <option value="">Choose a staff member…</option>
+                  <option value="">Choose a {t.staff}…</option>
                   {staff.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
               )}
@@ -202,13 +228,13 @@ export default function AddBooking() {
               </div>
             )}
 
-            {barber && service && date && (
+            {barber && picked.length > 0 && date && (
               <div>
                 <label className={label}>Time</label>
                 {loadingSlots ? (
                   <p className="text-sm text-slate-500">Loading times…</p>
                 ) : slots.length === 0 ? (
-                  <p className="text-sm text-slate-500">No open slots that day for a {service.mins || 30}-minute service.</p>
+                  <p className="text-sm text-slate-500">No open slots that day for a {totalMins}-minute appointment.</p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {slots.map((m) => (
