@@ -48,6 +48,8 @@ export async function POST(req) {
         stripe_payment_intent: b.stripe_payment_intent || null,
         status: b.status || "confirmed",
         custom_answers: b.custom_answers || [],
+        gap_after_min: b.gap_after_min || 0,
+        gap_min: b.gap_min || 0,
       })
       .select("id")
       .single();
