@@ -56,7 +56,7 @@ export default function Terms() {
 
           <div>
             <h2 className="mb-1 font-display text-lg font-semibold text-slate-900">Contact</h2>
-            <p>Questions? Email <a href="mailto:kursey686@gmail.com" className="text-[#13294b] underline">kursey686@gmail.com</a>.</p>
+            <p>Questions? Email <a href="mailto:support@kursey.com" className="text-[#13294b] underline">support@kursey.com</a>.</p>
           </div>
         </div>
       </div>

@@ -51,7 +51,7 @@ export default function Privacy() {
 
           <div>
             <h2 className="mb-1 font-display text-lg font-semibold text-slate-900">Contact</h2>
-            <p>Questions about this policy? Email us at <a href="mailto:kursey686@gmail.com" className="text-[#13294b] underline">kursey686@gmail.com</a>.</p>
+            <p>Questions about this policy? Email us at <a href="mailto:support@kursey.com" className="text-[#13294b] underline">support@kursey.com</a>.</p>
           </div>
         </div>
       </div>
