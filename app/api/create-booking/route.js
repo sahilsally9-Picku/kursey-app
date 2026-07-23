@@ -47,6 +47,7 @@ export async function POST(req) {
         deposit_amount: b.deposit_amount || 0,
         stripe_payment_intent: b.stripe_payment_intent || null,
         status: b.status || "confirmed",
+        custom_answers: b.custom_answers || [],
       })
       .select("id")
       .single();

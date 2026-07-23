@@ -47,6 +47,9 @@ function SettingsInner() {
   const [loginEmail, setLoginEmail] = useState(""); const [loginPass, setLoginPass] = useState("");
   const [creatingLogin, setCreatingLogin] = useState(false);
   const [businessType, setBusinessType] = useState("barbershop");
+  const [questions, setQuestions] = useState([]);
+  const [qLabel, setQLabel] = useState(""); const [qRequired, setQRequired] = useState(false);
+  const [savingQ, setSavingQ] = useState(false); const [qSaved, setQSaved] = useState(false);
 
   useEffect(() => {
     async function init() {
@@ -55,7 +58,7 @@ function SettingsInner() {
       const { data: shopData } = await supabase.from("shops").select("*").eq("owner_id", session.user.id).limit(1).single();
       if (!shopData) { router.push("/signup"); return; }
       setShop(shopData);
-      setBName(shopData.name || ""); setBDesc(shopData.description || ""); setBAddress(shopData.address || ""); setBPhone(shopData.phone || ""); setBusinessType(shopData.business_type || "barbershop");
+      setBName(shopData.name || ""); setBDesc(shopData.description || ""); setBAddress(shopData.address || ""); setBPhone(shopData.phone || ""); setBusinessType(shopData.business_type || "barbershop"); setQuestions(Array.isArray(shopData.booking_questions) ? shopData.booking_questions : []);
       setDepAmount(shopData.deposit_amount || 10);
       setChecking(false);
       loadServices(shopData.id); loadStaff(shopData.id);
@@ -151,6 +154,22 @@ function SettingsInner() {
       else { alert("Couldn't create login: " + (data.error || "unknown")); }
     } catch (err) { alert("Error: " + err.message); }
     setCreatingLogin(false);
+  }
+
+  function addQuestion() {
+    if (!qLabel.trim()) return;
+    if (questions.length >= 3) { alert("You can add up to 3 questions."); return; }
+    setQuestions((prev) => [...prev, { label: qLabel.trim(), required: qRequired }]);
+    setQLabel(""); setQRequired(false);
+  }
+  function removeQuestion(i) { setQuestions((prev) => prev.filter((_, idx) => idx !== i)); }
+  async function saveQuestions() {
+    setSavingQ(true); setQSaved(false);
+    const { error } = await supabase.from("shops").update({ booking_questions: questions }).eq("id", shop.id);
+    setSavingQ(false);
+    if (error) { alert("Couldn't save: " + error.message); return; }
+    setShop({ ...shop, booking_questions: questions });
+    setQSaved(true); setTimeout(() => setQSaved(false), 2000);
   }
 
   const [deleteText, setDeleteText] = useState("");
@@ -275,6 +294,36 @@ function SettingsInner() {
             </div>
           </div>
         ))}</div>}
+
+        {/* BOOKING QUESTIONS */}
+        <h2 className="mt-8 mb-2 font-display text-xl font-semibold">Booking questions</h2>
+        <div className={`p-4 ${card}`}>
+          <p className="text-sm text-slate-600">Ask customers up to 3 extra questions when they book — pet name and breed, skin sensitivities, their address, anything you need to know beforehand.</p>
+          {questions.length > 0 && (
+            <div className="mt-3 space-y-2">
+              {questions.map((q, i) => (
+                <div key={i} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
+                  <div><span className="text-sm font-medium">{q.label}</span>{q.required && <span className="ml-2 rounded-full bg-[#13294b]/10 px-2 py-0.5 text-xs font-medium text-[#13294b]">required</span>}</div>
+                  <button onClick={() => removeQuestion(i)} className="shrink-0 text-sm text-red-600 hover:underline">Remove</button>
+                </div>
+              ))}
+            </div>
+          )}
+          {questions.length < 3 && (
+            <div className="mt-3 space-y-2">
+              <input value={qLabel} onChange={(e) => setQLabel(e.target.value)} placeholder="e.g. What is your pet's name and breed?" className={input} />
+              <button onClick={() => setQRequired(!qRequired)} className="flex w-full items-center gap-2 rounded-xl bg-slate-50 p-3 text-left text-sm ring-1 ring-slate-200">
+                <span className={`grid h-4 w-4 shrink-0 place-items-center rounded border text-xs text-white ${qRequired ? "border-[#13294b] bg-[#13294b]" : "border-slate-300"}`}>{qRequired ? "✓" : ""}</span>
+                <span className="text-slate-700">Customers must answer this</span>
+              </button>
+              <button onClick={addQuestion} disabled={!qLabel.trim()} className={`w-full py-2.5 text-sm ${navyBtn}`}>+ Add question</button>
+            </div>
+          )}
+          <div className="mt-3 flex items-center gap-3">
+            <button onClick={saveQuestions} disabled={savingQ} className={`px-5 py-3 ${navyBtn}`}>{savingQ ? "Saving…" : "Save questions"}</button>
+            {qSaved && <span className="text-sm font-medium text-[#13294b]">Saved ✓</span>}
+          </div>
+        </div>
 
         {/* DANGER ZONE */}
         <h2 className="mt-8 mb-2 font-display text-xl font-semibold text-red-600">Danger zone</h2>
