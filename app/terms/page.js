@@ -26,7 +26,7 @@ export default function Terms() {
 
           <div>
             <h2 className="mb-1 font-display text-lg font-semibold text-slate-900">Subscriptions and free trial</h2>
-            <p>Kursey is offered on a subscription basis with a free trial. After the trial, continued use requires an active paid plan; if you do not subscribe, your booking page may be paused. Subscription fees are billed on a recurring basis until cancelled. You can cancel at any time, and cancellation stops future billing.</p>
+            <p>Kursey is offered on a subscription basis with a 14-day free trial. After the trial, continued use requires an active paid plan; if you do not subscribe, your booking page will be paused and will stop accepting new bookings. Subscription fees are billed on a recurring basis until cancelled. You can cancel at any time, and cancellation stops future billing.</p>
           </div>
 
           <div>
@@ -51,12 +51,12 @@ export default function Terms() {
 
           <div>
             <h2 className="mb-1 font-display text-lg font-semibold text-slate-900">Termination</h2>
-            <p>You may stop using Kursey at any time. We may suspend or end access for accounts that violate these terms.</p>
+            <p>You may stop using Kursey at any time, and you can delete your account and data from your Settings page. We may suspend or end access for accounts that violate these terms.</p>
           </div>
 
           <div>
             <h2 className="mb-1 font-display text-lg font-semibold text-slate-900">Contact</h2>
-            <p>Questions? Email <a href="mailto:support@kursey.com" className="text-[#13294b] underline">support@kursey.com</a>.</p>
+            <p>Questions? Email <a href="mailto:kursey686@gmail.com" className="text-[#13294b] underline">kursey686@gmail.com</a>.</p>
           </div>
         </div>
       </div>

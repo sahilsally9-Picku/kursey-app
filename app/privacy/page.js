@@ -21,7 +21,7 @@ export default function Privacy() {
 
           <div>
             <h2 className="mb-1 font-display text-lg font-semibold text-slate-900">Information we collect</h2>
-            <p>For businesses: your name, email, business details, and staff information you enter. For customers booking an appointment: your name, phone number, email, and appointment details. We also collect basic technical data (such as log information) needed to run the service.</p>
+            <p>For businesses: your name, email, business details, and staff information you enter. For customers booking an appointment: your name, phone number, email, appointment details, and any answers you give to the booking questions a business has set. We also collect basic technical data (such as log information) needed to run the service.</p>
           </div>
 
           <div>
@@ -46,12 +46,12 @@ export default function Privacy() {
 
           <div>
             <h2 className="mb-1 font-display text-lg font-semibold text-slate-900">Your rights</h2>
-            <p>You may request access to, correction of, or deletion of your personal information. Businesses can manage their account data in their dashboard. To request deletion of your information, contact us using the details below.</p>
+            <p>You may request access to, correction of, or deletion of your personal information. Businesses can delete their account and all associated data at any time from their Settings page. To request deletion of your information, contact us using the details below.</p>
           </div>
 
           <div>
             <h2 className="mb-1 font-display text-lg font-semibold text-slate-900">Contact</h2>
-            <p>Questions about this policy? Email us at <a href="mailto:support@kursey.com" className="text-[#13294b] underline">support@kursey.com</a>.</p>
+            <p>Questions about this policy? Email us at <a href="mailto:kursey686@gmail.com" className="text-[#13294b] underline">kursey686@gmail.com</a>.</p>
           </div>
         </div>
       </div>
