@@ -21,12 +21,24 @@ function upcomingDates(barber) {
   return out;
 }
 function breakBlocks(barber) { return (barber.breaks || []).map((b) => { const [s, e] = b.split("-"); return { s: toMin(s), e: toMin(e) }; }); }
-function tightSlots(barber, durMin, dayBookings) {
+function activeBlocks(total, gapAfter, gapMin) {
+  const post = total - (gapAfter || 0) - (gapMin || 0);
+  if (!gapMin || !gapAfter || post <= 0) return [{ o: 0, l: total }];
+  return [{ o: 0, l: gapAfter }, { o: gapAfter + gapMin, l: post }];
+}
+function tightSlots(barber, durMin, gapAfter, gapMin, dayBookings) {
   const dur = durMin || 30;
   const open = toMin(barber.start_time || "09:00"), close = toMin(barber.end_time || "17:00");
+  const blocks = activeBlocks(dur, gapAfter, gapMin);
   const busy = [...(dayBookings || []).filter((b) => b.start_min != null).map((b) => ({ s: b.start_min, e: b.start_min + (b.duration_min || 30) })), ...breakBlocks(barber)].sort((a, b) => a.s - b.s);
   const out = []; let cur = open, g = 0;
-  while (cur + dur <= close && g < 300) { g++; const hit = busy.find((b) => overlaps(cur, cur + dur, b.s, b.e)); if (hit) { cur = hit.e; continue; } out.push(cur); cur += dur; }
+  while (cur + dur <= close && g < 400) {
+    g++;
+    let advance = null;
+    for (const bl of blocks) { const hit = busy.find((b) => overlaps(cur + bl.o, cur + bl.o + bl.l, b.s, b.e)); if (hit) { advance = Math.max(cur + 5, hit.e - bl.o); break; } }
+    if (advance !== null) { cur = advance; continue; }
+    out.push(cur); cur += dur;
+  }
   return out;
 }
 
@@ -84,6 +96,9 @@ export default function AddBooking() {
   const totalMins = picked.reduce((n, s) => n + (s.mins || 30), 0);
   const totalPrice = picked.reduce((n, s) => n + (s.price || 0), 0);
   const serviceNames = picked.map((s) => s.name).join(" + ");
+  const soloService = picked.length === 1 ? picked[0] : null;
+  const gapAfter = soloService ? (soloService.gap_after_min || 0) : 0;
+  const gapMin = soloService ? (soloService.gap_min || 0) : 0;
   const t = terms(shop?.business_type);
 
   function toggleService(s) { setPicked((prev) => prev.some((p) => p.id === s.id) ? prev.filter((p) => p.id !== s.id) : [...prev, s]); setSlot(null); }
@@ -100,7 +115,8 @@ export default function AddBooking() {
     setSaving(true);
     const dur = totalMins || 30;
     const { data: fresh } = await supabase.rpc("busy_times", { p_shop_id: shop.id, p_barber: barber.name, p_date: date.key });
-    const clash = (fresh || []).some((b) => b.start_min != null && overlaps(slot, slot + dur, b.start_min, b.start_min + (b.duration_min || 30)));
+    const myBlocks = activeBlocks(dur, gapAfter, gapMin);
+    const clash = (fresh || []).some((b) => b.start_min != null && myBlocks.some((bl) => overlaps(slot + bl.o, slot + bl.o + bl.l, b.start_min, b.start_min + (b.duration_min || 30))));
     if (clash) { setSaving(false); setError("That time was just taken — please pick another."); setSlot(null); return; }
 
     const res = await fetch("/api/create-booking", {
@@ -112,6 +128,7 @@ export default function AddBooking() {
         customer_name: name, phone: phone, email: email, wants_offers: false,
         customer_user_id: null, deposit_paid: false, deposit_amount: 0,
         stripe_payment_intent: null, status: "confirmed",
+        gap_after_min: gapAfter, gap_min: gapMin,
       }),
     });
     const json = await res.json().catch(() => ({}));
@@ -135,7 +152,7 @@ export default function AddBooking() {
   const input = "w-full rounded-xl bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-1 ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-[#13294b]";
   const label = "mb-1 block text-sm font-medium text-slate-700";
   const dates = barber ? upcomingDates(barber) : [];
-  const slots = (barber && picked.length > 0 && date) ? tightSlots(barber, totalMins, dayBookings) : [];
+  const slots = (barber && picked.length > 0 && date) ? tightSlots(barber, totalMins, gapAfter, gapMin, dayBookings) : [];
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -192,7 +209,7 @@ export default function AddBooking() {
                     })}
                   </div>
                   {picked.length > 0 && (
-                    <p className="mt-2 text-sm font-medium text-[#13294b]">{picked.length} selected · {totalMins} min · ${totalPrice}</p>
+                    <p className="mt-2 text-sm font-medium text-[#13294b]">{picked.length} selected · {totalMins} min · ${totalPrice}{gapMin > 0 ? ` · ${gapMin} min processing gap` : ""}</p>
                   )}
                 </>
               )}
