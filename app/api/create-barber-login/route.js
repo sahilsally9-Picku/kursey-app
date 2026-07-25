@@ -1,9 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
+import { admin, requireShopOwner } from "../../../lib/auth";
 
 export async function POST(request) {
   try {
@@ -15,20 +10,21 @@ export async function POST(request) {
       return Response.json({ error: "Password must be at least 6 characters" }, { status: 400 });
     }
 
-    // make sure this staff belongs to this shop
-    const { data: staff } = await supabase.from("staff").select("*").eq("id", staffId).eq("shop_id", shopId).single();
-    if (!staff) return Response.json({ error: "Barber not found" }, { status: 404 });
+    // only the owner of this shop may create logins for its staff
+    const gate = await requireShopOwner(request, shopId);
+    if (gate.error) return Response.json({ error: gate.error }, { status: gate.status });
 
-    // create the auth user (confirmed, so they can log in right away)
-    const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+    const { data: staff } = await admin.from("staff").select("*").eq("id", staffId).eq("shop_id", shopId).single();
+    if (!staff) return Response.json({ error: "Staff member not found" }, { status: 404 });
+
+    const { data: created, error: createErr } = await admin.auth.admin.createUser({
       email: email.trim().toLowerCase(),
       password,
       email_confirm: true,
     });
     if (createErr) return Response.json({ error: createErr.message }, { status: 400 });
 
-    // link the login to this barber
-    const { error: updErr } = await supabase.from("staff")
+    const { error: updErr } = await admin.from("staff")
       .update({ user_id: created.user.id, login_email: email.trim().toLowerCase() })
       .eq("id", staffId);
     if (updErr) return Response.json({ error: updErr.message }, { status: 400 });

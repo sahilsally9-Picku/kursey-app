@@ -1,39 +1,40 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
+import { admin, getCaller, isPlatformAdmin } from "../../../lib/auth";
 
 export async function POST(req) {
   try {
-    const { userId } = await req.json();
-    if (!userId) return NextResponse.json({ error: "Missing user" }, { status: 400 });
+    // You must be logged in, and you can only delete your own account
+    // (platform admins may delete someone else's).
+    const caller = await getCaller(req);
+    if (!caller) return NextResponse.json({ error: "Please log in and try again." }, { status: 401 });
 
-    // find this owner's shop
-    const { data: shop } = await supabaseAdmin
-      .from("shops")
-      .select("id")
-      .eq("owner_id", userId)
-      .limit(1)
-      .single();
+    const body = await req.json().catch(() => ({}));
+    let targetId = caller.id;
+    if (body.userId && body.userId !== caller.id) {
+      if (!(await isPlatformAdmin(caller.id))) {
+        return NextResponse.json({ error: "You can only delete your own account." }, { status: 403 });
+      }
+      targetId = body.userId;
+    }
+
+    const { data: shop } = await admin
+      .from("shops").select("id").eq("owner_id", targetId).limit(1).single();
 
     if (shop) {
       const sid = shop.id;
-      // remove child data first (in case cascade isn't set on every table)
-      await supabaseAdmin.from("bookings").delete().eq("shop_id", sid);
-      await supabaseAdmin.from("reviews").delete().eq("shop_id", sid);
-      await supabaseAdmin.from("customer_profiles").delete().eq("shop_id", sid);
-      await supabaseAdmin.from("marketing_optouts").delete().eq("shop_id", sid);
-      await supabaseAdmin.from("services").delete().eq("shop_id", sid);
-      await supabaseAdmin.from("staff").delete().eq("shop_id", sid);
-      await supabaseAdmin.from("shops").delete().eq("id", sid);
+      await admin.from("bookings").delete().eq("shop_id", sid);
+      await admin.from("reviews").delete().eq("shop_id", sid);
+      await admin.from("customer_profiles").delete().eq("shop_id", sid);
+      await admin.from("marketing_optouts").delete().eq("shop_id", sid);
+      await admin.from("services").delete().eq("shop_id", sid);
+      await admin.from("staff").delete().eq("shop_id", sid);
+      await admin.from("shops").delete().eq("id", sid);
     }
 
-    // finally, delete the auth login itself
-    const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(userId);
-    if (authErr) return NextResponse.json({ error: "Data removed, but couldn't delete login: " + authErr.message }, { status: 500 });
+    const { error: authErr } = await admin.auth.admin.deleteUser(targetId);
+    if (authErr) {
+      return NextResponse.json({ error: "Data removed, but couldn't delete login: " + authErr.message }, { status: 500 });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err) {

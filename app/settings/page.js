@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { supabase } from "../../lib/supabase";
+import { apiPost } from "../../lib/api";
 import { terms, cap, BUSINESS_TYPES, features } from "../../lib/terms";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -153,11 +154,7 @@ function SettingsInner() {
     if (!loginEmail || !loginPass) { alert("Enter an email and password."); return; }
     setCreatingLogin(true);
     try {
-      const res = await fetch("/api/create-barber-login", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ staffId: loginFor, shopId: shop.id, email: loginEmail, password: loginPass }),
-      });
-      const data = await res.json();
+      const data = await apiPost("/api/create-barber-login", { staffId: loginFor, shopId: shop.id, email: loginEmail, password: loginPass });
       if (data.ok) { setLoginFor(null); setLoginEmail(""); setLoginPass(""); loadStaff(shop.id); alert("Staff login created! They can now log in at kursey.com/login with that email and password."); }
       else { alert("Couldn't create login: " + (data.error || "unknown")); }
     } catch (err) { alert("Error: " + err.message); }
@@ -188,12 +185,8 @@ function SettingsInner() {
     setDeleting(true);
     const { data: { session } } = await supabase.auth.getSession();
     try {
-      const res = await fetch("/api/delete-account", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: session.user.id }),
-      });
-      const data = await res.json();
-      if (!res.ok || data.error) { setDeleting(false); alert("Couldn't delete: " + (data.error || "please try again")); return; }
+      const data = await apiPost("/api/delete-account", {});
+      if (data.error) { setDeleting(false); alert("Couldn't delete: " + data.error); return; }
       await supabase.auth.signOut();
       window.location.href = "/";
     } catch (err) { setDeleting(false); alert("Error: " + err.message); }
