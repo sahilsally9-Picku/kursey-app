@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState("login"); // login | forgot
@@ -53,7 +54,10 @@ export default function Login() {
             <p className="mb-5 text-sm text-slate-500">Owners and staff sign in here.</p>
             <div className="space-y-2">
               <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" className={input} />
-              <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" className={input} />
+              <div className="relative">
+                <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type={showPass ? "text" : "password"} className={`${input} pr-12`} />
+                <button type="button" onClick={() => setShowPass(!showPass)} className="absolute inset-y-0 right-0 flex items-center px-3 text-xs font-medium text-slate-500 hover:text-slate-700">{showPass ? "Hide" : "Show"}</button>
+              </div>
             </div>
             {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
             <button disabled={loading || !email || !password} onClick={handleLogin} className={`mt-4 ${navyBtn}`}>{loading ? "Signing in…" : "Sign in"}</button>

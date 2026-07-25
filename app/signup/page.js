@@ -11,6 +11,7 @@ export default function Signup() {
   const [businessType, setBusinessType] = useState("barbershop");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -73,7 +74,10 @@ export default function Signup() {
             <p className="mt-1 text-xs text-slate-500">Your booking link: kursey.com/{slug || "your-shop"}</p>
           </div>
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" className={input} />
-          <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password (min 6 characters)" type="password" className={input} />
+          <div className="relative">
+            <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password (min 6 characters)" type={showPass ? "text" : "password"} className={`${input} pr-12`} />
+            <button type="button" onClick={() => setShowPass(!showPass)} className="absolute inset-y-0 right-0 flex items-center px-3 text-xs font-medium text-slate-500 hover:text-slate-700">{showPass ? "Hide" : "Show"}</button>
+          </div>
         </div>
 
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
