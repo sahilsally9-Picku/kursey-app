@@ -151,6 +151,16 @@ export default function PlanPage() {
               >
                 {busy ? "Opening…" : blocked ? "Remove staff first" : isActive ? `Switch to ${selectedObj.name} — ${selectedObj.price}/mo` : `Subscribe to ${selectedObj.name} — ${selectedObj.price}/mo`}
               </button>
+
+              {!isActive && daysLeft > 0 && (
+                <button
+                  type="button"
+                  onClick={() => router.push("/dashboard")}
+                  className="mt-1 text-sm font-medium text-slate-500 underline decoration-slate-300 underline-offset-4 transition hover:text-slate-800"
+                >
+                  Skip for now — keep my {daysLeft} day{daysLeft === 1 ? "" : "s"} free
+                </button>
+              )}
             </>
           )}
         </div>
