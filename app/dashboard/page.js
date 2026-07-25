@@ -210,7 +210,10 @@ export default function Dashboard() {
           </a>
         </div>
 
-        <h2 className="mt-6 mb-2 font-display text-xl font-semibold">What Kursey is doing for you</h2>
+        <div className="mt-6 mb-2 flex items-baseline justify-between gap-3">
+          <h2 className="font-display text-xl font-semibold">What Kursey is doing for you</h2>
+          <a href="/roi" className="shrink-0 text-sm font-medium text-[#13294b] hover:underline">See the full breakdown →</a>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <div className={`p-4 ${card}`}><div className="text-2xl font-bold text-[#13294b]">${depositsCollected}</div><div className="text-sm text-slate-600">Deposits secured{depositsCount > 0 ? ` (${depositsCount})` : ""}</div></div>
           <div className={`p-4 ${card}`}><div className="text-2xl font-bold text-[#13294b]">{afterHours}</div><div className="text-sm text-slate-600">Booked while you were closed</div></div>
