@@ -46,6 +46,8 @@ export default function Dashboard() {
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.push("/login"); return; }
+      const { data: adminRow } = await supabase.from("platform_admins").select("user_id").eq("user_id", session.user.id).limit(1).single();
+      if (adminRow) { router.replace("/admin"); return; }
       const { data: shopData } = await supabase.from("shops").select("*").eq("owner_id", session.user.id).limit(1).single();
       if (!shopData) { router.push("/signup"); return; }
       setShop(shopData); setChecking(false);

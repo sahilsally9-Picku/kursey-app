@@ -85,7 +85,7 @@ export default function AdminPanel() {
             <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Kursey admin</h1>
             <p className="text-sm text-slate-500">Platform overview — every shop on Kursey.</p>
           </div>
-          <a href="/dashboard" className="whitespace-nowrap text-sm font-medium text-[#13294b] hover:underline">← My dashboard</a>
+          <button onClick={async () => { await supabase.auth.signOut(); router.replace("/login"); }} className="whitespace-nowrap text-sm font-medium text-[#13294b] hover:underline">Log out</button>
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">

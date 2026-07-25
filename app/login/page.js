@@ -19,6 +19,9 @@ export default function Login() {
     const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) { setLoading(false); setError(error.message); return; }
     const userId = signInData.user.id;
+    // platform admin goes straight to the admin panel
+    const { data: adminRow } = await supabase.from("platform_admins").select("user_id").eq("user_id", userId).limit(1).single();
+    if (adminRow) { setLoading(false); router.replace("/admin"); return; }
     const { data: staffRow } = await supabase.from("staff").select("id").eq("user_id", userId).limit(1).single();
     setLoading(false);
     if (staffRow) { router.replace("/barber"); }
