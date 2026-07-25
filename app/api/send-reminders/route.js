@@ -6,19 +6,28 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
-// normal windows: ~24h before, and ~3h before
-const DAY_WINDOW = [23 * 60, 25 * 60];
-const HOURS_WINDOW = [2 * 60, 4 * 60];
+// Where your shops actually are. If you later add a `timezone` column to the
+// shops table, that value wins and this is only the fallback.
+const DEFAULT_TZ = "America/Halifax";
 
 // email the shop owner when their trial has this many days (or fewer) left
 const TRIAL_NUDGE_DAYS = 3;
 
-function bookingStartsInMinutes(b) {
-  if (!b.booking_date || b.start_min == null) return null;
-  const [y, mo, d] = b.booking_date.split("-").map(Number);
-  const start = new Date(y, mo - 1, d, 0, 0, 0);
-  start.setMinutes(b.start_min);
-  return Math.round((start.getTime() - Date.now()) / 60000);
+// today's date AND the current time, as the shop experiences them
+function nowInTz(tz) {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  });
+  const p = Object.fromEntries(fmt.formatToParts(new Date()).map((x) => [x.type, x.value]));
+  return { date: `${p.year}-${p.month}-${p.day}`, minutes: Number(p.hour) * 60 + Number(p.minute) };
+}
+
+function addDays(dateStr, n) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + n);
+  return dt.toISOString().slice(0, 10);
 }
 
 async function sendReminder(resend, b, whenText) {
@@ -83,22 +92,47 @@ async function sendTrialNudge(resend, shop, to, daysLeft) {
   return !error;
 }
 
-export async function GET() {
+export async function GET(request) {
+  // Only Vercel's cron (which sends the secret as a Bearer header) or someone
+  // who knows the key (?key=... for manual testing) can trigger a send.
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return Response.json({ error: "CRON_SECRET is not set" }, { status: 500 });
+  const auth = request.headers.get("authorization") || "";
+  const key = new URL(request.url).searchParams.get("key") || "";
+  if (auth !== `Bearer ${secret}` && key !== secret) {
+    return Response.json({ error: "Not authorised" }, { status: 401 });
+  }
+
   try {
     const resend = new Resend(process.env.RESEND_API_KEY);
-    const today = new Date().toISOString().slice(0, 10);
-    const { data: bookings } = await supabase
-      .from("bookings").select("*").gte("booking_date", today);
+    const now = nowInTz(DEFAULT_TZ);
+    const todayStr = now.date;
+    const tomorrowStr = addDays(todayStr, 1);
 
-    let sentDay = 0, sentHours = 0;
+    // Only two days matter: today and tomorrow.
+    const { data: bookings } = await supabase
+      .from("bookings").select("*")
+      .in("booking_date", [todayStr, tomorrowStr]);
+
+    let sentDay = 0, sentToday = 0;
     for (const b of bookings || []) {
-      const mins = bookingStartsInMinutes(b);
-      if (mins == null || mins < 0) continue;
-      if (!b.reminder_day_sent && mins >= DAY_WINDOW[0] && mins <= DAY_WINDOW[1]) {
-        if (await sendReminder(resend, b, "tomorrow")) { await supabase.from("bookings").update({ reminder_day_sent: true }).eq("id", b.id); sentDay++; }
+      if (b.start_min == null) continue;
+
+      // Anything booked for tomorrow gets the day-before email — no time window,
+      // so a 2pm cut is covered just as well as a 9am one.
+      if (b.booking_date === tomorrowStr && !b.reminder_day_sent) {
+        if (await sendReminder(resend, b, "tomorrow")) {
+          await supabase.from("bookings").update({ reminder_day_sent: true }).eq("id", b.id);
+          sentDay++;
+        }
       }
-      if (!b.reminder_hours_sent && mins >= HOURS_WINDOW[0] && mins <= HOURS_WINDOW[1]) {
-        if (await sendReminder(resend, b, "in a few hours")) { await supabase.from("bookings").update({ reminder_hours_sent: true }).eq("id", b.id); sentHours++; }
+
+      // Anything left today that hasn't happened yet gets the morning-of email.
+      if (b.booking_date === todayStr && !b.reminder_hours_sent && b.start_min > now.minutes) {
+        if (await sendReminder(resend, b, "today")) {
+          await supabase.from("bookings").update({ reminder_hours_sent: true }).eq("id", b.id);
+          sentToday++;
+        }
       }
     }
 
@@ -122,7 +156,10 @@ export async function GET() {
       }
     }
 
-    return Response.json({ ok: true, sentDay, sentHours, sentTrial, checked: (bookings || []).length });
+    return Response.json({
+      ok: true, localDate: todayStr, localTime: now.minutes,
+      sentDay, sentToday, sentTrial, checked: (bookings || []).length,
+    });
   } catch (err) {
     return Response.json({ error: err.message }, { status: 500 });
   }
