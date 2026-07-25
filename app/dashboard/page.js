@@ -29,6 +29,18 @@ function tightSlots(barber, durMin, busy) {
   return out;
 }
 
+function next14Days() {
+  const out = [];
+  const today = new Date();
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(today); d.setDate(today.getDate() + i);
+    const key = d.toISOString().slice(0, 10);
+    const label = i === 0 ? "Today" : i === 1 ? "Tomorrow" : DAY_NAMES[d.getDay()];
+    out.push({ key, label, sub: `${MONTHS[d.getMonth()]} ${d.getDate()}` });
+  }
+  return out;
+}
+
 export default function Dashboard() {
   const [checking, setChecking] = useState(true);
   const [shop, setShop] = useState(null);
@@ -39,6 +51,8 @@ export default function Dashboard() {
   const [rescheduleId, setRescheduleId] = useState(null);
   const [rDate, setRDate] = useState(""); const [rSlot, setRSlot] = useState(null);
   const [rSaving, setRSaving] = useState(false); const [rErr, setRErr] = useState("");
+
+  const [dateFilter, setDateFilter] = useState(new Date().toISOString().slice(0, 10));
 
   const router = useRouter();
 
@@ -207,11 +221,36 @@ export default function Dashboard() {
         </div>
 
         <h2 className="mt-6 mb-2 font-display text-xl font-semibold">Bookings</h2>
+
+        <div className="mb-3 flex items-center gap-2">
+          <button onClick={() => setDateFilter("all")} className={`rounded-lg px-3 py-1.5 text-sm font-medium ring-1 transition ${dateFilter === "all" ? "bg-[#13294b] text-white ring-[#13294b]" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}>All</button>
+          <button onClick={() => setDateFilter(today)} className={`rounded-lg px-3 py-1.5 text-sm font-medium ring-1 transition ${dateFilter === today ? "bg-[#13294b] text-white ring-[#13294b]" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}>Today</button>
+          <input value={dateFilter === "all" ? "" : dateFilter} onChange={(e) => setDateFilter(e.target.value || "all")} type="date" className="rounded-lg bg-white px-3 py-1.5 text-sm text-slate-900 outline-none ring-1 ring-slate-300 focus:ring-2 focus:ring-[#13294b]" />
+        </div>
+
+        <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+          {next14Days().map((d) => {
+            const n = bookings.filter((x) => !x.is_block && x.status !== "cancelled" && x.booking_date === d.key).length;
+            const selected = dateFilter === d.key;
+            return (
+              <button key={d.key} onClick={() => setDateFilter(d.key)} className={`min-w-[68px] shrink-0 rounded-xl px-2 py-2 text-center ring-1 transition ${selected ? "bg-[#13294b] text-white ring-[#13294b]" : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"}`}>
+                <div className="text-sm font-semibold">{d.label}</div>
+                <div className={`text-xs ${selected ? "text-white/70" : "text-slate-400"}`}>{d.sub}</div>
+                {n > 0 && <div className={`mx-auto mt-1 w-fit rounded-full px-1.5 text-[10px] font-bold ${selected ? "bg-white/25 text-white" : "bg-[#13294b]/10 text-[#13294b]"}`}>{n}</div>}
+              </button>
+            );
+          })}
+        </div>
+
         {loading ? <p className="text-slate-500">Loading…</p>
-        : bookings.length === 0 ? <p className={`p-4 text-slate-600 ${card}`}>No bookings yet. Share your booking link to get started.</p>
-        : (
+        : (() => {
+            const visible = (dateFilter === "all" ? bookings : bookings.filter((b) => b.booking_date === dateFilter))
+              .slice().sort((a, b) => (a.start_min ?? 0) - (b.start_min ?? 0));
+            if (bookings.length === 0) return <p className={`p-4 text-slate-600 ${card}`}>No bookings yet. Share your booking link to get started.</p>;
+            if (visible.length === 0) return <p className={`p-4 text-slate-600 ${card}`}>{dateFilter === "all" ? "No bookings yet." : "Nothing booked for this day."}</p>;
+            return (
           <div className="space-y-2">
-            {bookings.map((b) => {
+            {visible.map((b) => {
               const canReschedule = !b.is_block && b.status !== "cancelled" && b.booking_date && b.booking_date >= today;
               const barber = staff.find((s) => s.name === b.barber);
               const dates = barber ? upcomingDates(barber.work_days) : [];
@@ -269,7 +308,8 @@ export default function Dashboard() {
               );
             })}
           </div>
-        )}
+            );
+          })()}
       </div>
     </div>
   );
