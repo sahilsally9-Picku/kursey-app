@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { supabase } from "../../lib/supabase";
-import { terms, cap, BUSINESS_TYPES } from "../../lib/terms";
+import { terms, cap, BUSINESS_TYPES, features } from "../../lib/terms";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const colors = [
@@ -206,6 +206,7 @@ function SettingsInner() {
   const card = "rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm";
   const navyBtn = "rounded-xl bg-[#13294b] font-semibold text-white shadow-sm transition enabled:hover:bg-[#1d3a63] disabled:opacity-40";
   const t = terms(businessType);
+  const feat = features(businessType);
   const connected = !!shop.stripe_account_id;
   const justReturned = searchParams.get("stripe") === "done";
 
@@ -257,7 +258,7 @@ function SettingsInner() {
         <h2 className="mt-8 mb-2 font-display text-xl font-semibold">Services ({services.length})</h2>
         <div className={`p-4 ${editServiceId ? "rounded-2xl bg-white ring-1 ring-[#13294b]/30 shadow-sm" : card}`}>
           {editServiceId && <p className="mb-2 text-sm font-medium text-[#13294b]">Editing service…</p>}
-          <div className="space-y-2"><input value={sName} onChange={(e) => setSName(e.target.value)} placeholder="Service name" className={input} /><div className="flex gap-2"><input value={sPrice} onChange={(e) => setSPrice(e.target.value)} placeholder="Price $" type="number" className={input} /><input value={sMins} onChange={(e) => setSMins(e.target.value)} placeholder="Minutes" type="number" className={input} /></div><textarea value={sDesc} onChange={(e) => setSDesc(e.target.value)} placeholder="Description (optional)" rows={2} className={`${input} resize-none`} /><div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200"><div className="text-xs font-medium text-slate-700">Processing time <span className="font-normal text-slate-500">— optional</span></div><p className="mt-0.5 text-xs text-slate-500">For colour, perms and similar: how long you're hands-on first, then how long the client processes while you're free. Leave blank for normal services.</p><div className="mt-2 flex gap-2"><input value={sGapAfter} onChange={(e) => setSGapAfter(e.target.value)} placeholder="Hands-on min" type="number" className={input} /><input value={sGap} onChange={(e) => setSGap(e.target.value)} placeholder="Gap min" type="number" className={input} /></div></div><div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200"><div className="text-xs font-medium text-slate-700">Group class <span className="font-normal text-slate-500">— optional</span></div><p className="mt-0.5 text-xs text-slate-500">How many people can book the same time slot. Leave blank for one-on-one appointments.</p><input value={sCap} onChange={(e) => setSCap(e.target.value)} placeholder="Max people (e.g. 15)" type="number" className={`${input} mt-2`} /></div></div>
+          <div className="space-y-2"><input value={sName} onChange={(e) => setSName(e.target.value)} placeholder="Service name" className={input} /><div className="flex gap-2"><input value={sPrice} onChange={(e) => setSPrice(e.target.value)} placeholder="Price $" type="number" className={input} /><input value={sMins} onChange={(e) => setSMins(e.target.value)} placeholder="Minutes" type="number" className={input} /></div><textarea value={sDesc} onChange={(e) => setSDesc(e.target.value)} placeholder="Description (optional)" rows={2} className={`${input} resize-none`} />{feat.processing && (<div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200"><div className="text-xs font-medium text-slate-700">Processing time <span className="font-normal text-slate-500">— optional</span></div><p className="mt-0.5 text-xs text-slate-500">For colour, perms and similar: how long you're hands-on first, then how long the client processes while you're free. Leave blank for normal services.</p><div className="mt-2 flex gap-2"><input value={sGapAfter} onChange={(e) => setSGapAfter(e.target.value)} placeholder="Hands-on min" type="number" className={input} /><input value={sGap} onChange={(e) => setSGap(e.target.value)} placeholder="Gap min" type="number" className={input} /></div></div>)}{feat.classes && (<div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200"><div className="text-xs font-medium text-slate-700">Group class <span className="font-normal text-slate-500">— optional</span></div><p className="mt-0.5 text-xs text-slate-500">How many people can book the same time slot. Leave blank for one-on-one appointments.</p><input value={sCap} onChange={(e) => setSCap(e.target.value)} placeholder="Max people (e.g. 15)" type="number" className={`${input} mt-2`} /></div>)}</div>
           <div className="mt-3 flex gap-2"><button disabled={!sName || !sPrice} onClick={saveService} className={`flex-1 py-3 ${navyBtn}`}>{editServiceId ? "Save changes" : "Add service"}</button>{editServiceId && <button onClick={resetServiceForm} className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700">Cancel</button>}</div>
         </div>
         {services.length > 0 && <div className="mt-2 space-y-2">{services.map((s) => (<div key={s.id} className={`flex items-start justify-between p-4 ${card}`}><div className="pr-3"><div className="font-medium">{s.name}</div><div className="text-sm text-slate-600">{s.mins} min · ${s.price}</div>{s.gap_min > 0 && s.gap_after_min > 0 && <div className="text-xs font-medium text-[#13294b]">{s.gap_after_min} min hands-on · {s.gap_min} min processing · {s.mins - s.gap_after_min - s.gap_min} min finish</div>}{s.capacity > 1 && <div className="text-xs font-medium text-[#13294b]">Group class · up to {s.capacity} people</div>}{s.description && <div className="mt-0.5 font-display text-xs italic text-slate-500">{s.description}</div>}</div><div className="flex shrink-0 items-center gap-3"><button onClick={() => startEditService(s)} className="text-sm text-[#13294b] hover:underline">Edit</button><button onClick={() => deleteService(s.id)} className="text-sm text-red-600 hover:underline">Remove</button></div></div>))}</div>}
@@ -306,7 +307,7 @@ function SettingsInner() {
         {/* BOOKING QUESTIONS */}
         <h2 className="mt-8 mb-2 font-display text-xl font-semibold">Booking questions</h2>
         <div className={`p-4 ${card}`}>
-          <p className="text-sm text-slate-600">Ask customers up to 3 extra questions when they book — pet name and breed, skin sensitivities, their address, anything you need to know beforehand.</p>
+          <p className="text-sm text-slate-600">Ask customers up to 3 extra questions when they book — anything you need to know before the appointment.</p>
           {questions.length > 0 && (
             <div className="mt-3 space-y-2">
               {questions.map((q, i) => (
@@ -319,7 +320,7 @@ function SettingsInner() {
           )}
           {questions.length < 3 && (
             <div className="mt-3 space-y-2">
-              <input value={qLabel} onChange={(e) => setQLabel(e.target.value)} placeholder="e.g. What is your pet's name and breed?" className={input} />
+              <input value={qLabel} onChange={(e) => setQLabel(e.target.value)} placeholder="e.g. Anything we should know before your visit?" className={input} />
               <button onClick={() => setQRequired(!qRequired)} className="flex w-full items-center gap-2 rounded-xl bg-slate-50 p-3 text-left text-sm ring-1 ring-slate-200">
                 <span className={`grid h-4 w-4 shrink-0 place-items-center rounded border text-xs text-white ${qRequired ? "border-[#13294b] bg-[#13294b]" : "border-slate-300"}`}>{qRequired ? "✓" : ""}</span>
                 <span className="text-slate-700">Customers must answer this</span>
