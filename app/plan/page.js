@@ -14,8 +14,8 @@ export default function PlanPage() {
   const [checking, setChecking] = useState(true);
   const [shop, setShop] = useState(null);
   const [staffCount, setStaffCount] = useState(0);
-  const [busy, setBusy] = useState(null);
-  const [saving, setSaving] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [selected, setSelected] = useState("shop");
   const router = useRouter();
 
   useEffect(() => {
@@ -25,6 +25,7 @@ export default function PlanPage() {
       const { data: shopData } = await supabase.from("shops").select("*").eq("owner_id", session.user.id).limit(1).single();
       if (!shopData) { router.replace("/signup"); return; }
       setShop(shopData);
+      setSelected(shopData.plan || "shop");
       const { count } = await supabase.from("staff").select("id", { count: "exact", head: true }).eq("shop_id", shopData.id);
       setStaffCount(count || 0);
       setChecking(false);
@@ -34,18 +35,17 @@ export default function PlanPage() {
 
   function overLimit(plan) { return staffCount > plan.limit; }
 
-  async function chooseFree(planId) {
+  // Clicking a card only highlights it. During the trial we quietly remember the
+  // choice on the shop row (so trial staff limits still work) — no redirect.
+  async function pickPlan(planId) {
+    setSelected(planId);
+    if (!shop) return;
+    if (shop.subscription_status === "active") return;
     const plan = PLANS.find((p) => p.id === planId);
-    if (overLimit(plan)) {
-      alert(`You currently have ${staffCount} staff. The ${plan.name} plan allows ${plan.limit === Infinity ? "unlimited" : plan.limit}. Please remove staff first, or choose a larger plan.`);
-      return;
-    }
-    setSaving(planId);
+    if (overLimit(plan)) return;
+    if (shop.plan === planId) return;
     const { error } = await supabase.from("shops").update({ plan: planId }).eq("id", shop.id);
-    setSaving(null);
-    if (error) { alert("Couldn't save your plan: " + error.message); return; }
-    setShop({ ...shop, plan: planId });
-    router.replace("/dashboard");
+    if (!error) setShop({ ...shop, plan: planId });
   }
 
   async function subscribePaid(planId) {
@@ -54,7 +54,7 @@ export default function PlanPage() {
       alert(`You currently have ${staffCount} staff. The ${plan.name} plan allows ${plan.limit === Infinity ? "unlimited" : plan.limit}. Please remove staff first, or choose a larger plan.`);
       return;
     }
-    setBusy(planId);
+    setBusy(true);
     try {
       const res = await fetch("/api/create-subscription", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -62,15 +62,18 @@ export default function PlanPage() {
       });
       const data = await res.json();
       if (data.url) { window.location.href = data.url; }
-      else { alert("Couldn't start checkout: " + (data.error || "unknown")); setBusy(null); }
-    } catch (err) { alert("Error: " + err.message); setBusy(null); }
+      else { alert("Couldn't start checkout: " + (data.error || "unknown")); setBusy(false); }
+    } catch (err) { alert("Error: " + err.message); setBusy(false); }
   }
 
   if (checking) return <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500">Loading…</div>;
 
   const isActive = shop.subscription_status === "active";
-  const currentPlan = shop.plan || "shop";
-  const selectedPlanObj = PLANS.find((p) => p.id === currentPlan) || PLANS[1];
+  const activePlan = shop.plan || "shop";
+  const selectedObj = PLANS.find((p) => p.id === selected) || PLANS[1];
+  const blocked = overLimit(selectedObj);
+  const sameAsActive = isActive && activePlan === selected;
+
   const card = "rounded-2xl border border-slate-200 bg-white shadow-sm";
   const navyBtn = "rounded-xl bg-[#13294b] font-semibold text-white shadow-sm transition enabled:hover:bg-[#1d3a63] disabled:opacity-40";
 
@@ -90,49 +93,67 @@ export default function PlanPage() {
 
         {!isActive && (
           <div className="mt-4 rounded-2xl bg-[#13294b]/5 p-4 text-sm text-slate-700 ring-1 ring-[#13294b]/15">
-            <span className="font-semibold text-slate-900">You're on a free trial{daysLeft ? ` — ${daysLeft} day${daysLeft === 1 ? "" : "s"} left` : ""}.</span> Pick the plan you want — you won't be charged. Your trial runs on that plan's staff limit, and you can subscribe whenever you're ready.
+            <span className="font-semibold text-slate-900">You're on a free trial{daysLeft ? ` — ${daysLeft} day${daysLeft === 1 ? "" : "s"} left` : ""}.</span> Tap a plan to select it — you won't be charged. Your trial runs on that plan's staff limit, and you can subscribe whenever you're ready.
           </div>
         )}
 
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
           {PLANS.map((p) => {
-            const isCurrent = currentPlan === p.id;
-            const blocked = overLimit(p);
+            const isSelected = selected === p.id;
+            const isCurrent = isActive && activePlan === p.id;
+            const cardBlocked = overLimit(p);
+            const ring = isSelected ? "ring-2 ring-[#13294b]" : p.popular ? "ring-1 ring-[#13294b]/25" : "";
             return (
-              <div key={p.id} className={`relative flex flex-col p-5 ${card} ${p.popular ? "ring-2 ring-[#13294b]" : ""}`}>
-                {p.popular && <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#13294b] px-3 py-0.5 text-xs font-bold text-white shadow">Most popular</div>}
-                <div className="font-display text-xl font-semibold">{p.name}</div>
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => pickPlan(p.id)}
+                className={`relative flex flex-col p-5 text-left transition ${card} ${ring} ${isSelected ? "" : "hover:shadow-md"}`}
+              >
+                {p.popular && !isSelected && <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#13294b] px-3 py-0.5 text-xs font-bold text-white shadow">Most popular</div>}
+                {isSelected && <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#13294b] px-3 py-0.5 text-xs font-bold text-white shadow">✓ Selected</div>}
+
+                <div className="flex items-center gap-2">
+                  <span className="font-display text-xl font-semibold">{p.name}</span>
+                  {isCurrent && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">Current</span>}
+                </div>
+
                 <div className="mt-1 flex items-end gap-1"><span className="font-display text-3xl font-bold text-[#13294b]">{p.price}</span><span className="mb-1 text-sm text-slate-500">/mo</span></div>
                 <p className="mt-2 text-sm text-slate-600">{p.blurb}</p>
                 <ul className="mt-3 flex-1 space-y-1.5 text-sm text-slate-700">
                   {p.features.map((f) => (<li key={f} className="flex items-start gap-2"><span className="mt-0.5 text-[#13294b]">✓</span>{f}</li>))}
                 </ul>
 
-                {isActive ? (
-                  isCurrent ? (
-                    <div className="mt-4 rounded-xl bg-slate-100 py-2.5 text-center text-sm font-semibold text-[#13294b] ring-1 ring-slate-200">Current plan</div>
-                  ) : (
-                    <button onClick={() => subscribePaid(p.id)} disabled={busy === p.id || blocked} className={`mt-4 py-2.5 ${navyBtn}`}>{busy === p.id ? "Opening…" : blocked ? "Remove staff first" : "Switch to this plan"}</button>
-                  )
-                ) : (
-                  isCurrent ? (
-                    <div className="mt-4 rounded-xl bg-[#13294b]/10 py-2.5 text-center text-sm font-semibold text-[#13294b] ring-1 ring-[#13294b]/20">✓ Your trial plan</div>
-                  ) : (
-                    <button onClick={() => chooseFree(p.id)} disabled={saving === p.id || blocked} className={`mt-4 py-2.5 ${navyBtn}`}>{saving === p.id ? "Saving…" : blocked ? "Remove staff first" : "Choose this plan"}</button>
-                  )
-                )}
-              </div>
+                {cardBlocked && <div className="mt-3 rounded-lg bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-800 ring-1 ring-amber-200">Too small for your {staffCount} staff</div>}
+              </button>
             );
           })}
         </div>
 
-        {!isActive && (
-          <div className={`mt-6 flex flex-col items-center gap-2 p-5 text-center ${card}`}>
-            <div className="font-display text-lg font-semibold">Ready to subscribe?</div>
-            <p className="max-w-md text-sm text-slate-600">You won't be charged during your free trial. When you subscribe, you'll be billed {selectedPlanObj.price}/mo for the {selectedPlanObj.name} plan.</p>
-            <button onClick={() => subscribePaid(currentPlan)} disabled={busy === currentPlan} className={`mt-1 px-6 py-3 ${navyBtn}`}>{busy === currentPlan ? "Opening…" : `Subscribe — ${selectedPlanObj.price}/mo`}</button>
-          </div>
-        )}
+        <div className={`mt-6 flex flex-col items-center gap-2 p-5 text-center ${card}`}>
+          {sameAsActive ? (
+            <>
+              <div className="font-display text-lg font-semibold">You're subscribed to {selectedObj.name}</div>
+              <p className="max-w-md text-sm text-slate-600">You're being billed {selectedObj.price}/mo. Pick a different plan above if you'd like to switch.</p>
+            </>
+          ) : (
+            <>
+              <div className="font-display text-lg font-semibold">{isActive ? `Switch to ${selectedObj.name}?` : "Ready to subscribe?"}</div>
+              <p className="max-w-md text-sm text-slate-600">
+                {isActive
+                  ? `You'll be billed ${selectedObj.price}/mo for the ${selectedObj.name} plan from your next billing date.`
+                  : `You won't be charged during your free trial. When you subscribe, you'll be billed ${selectedObj.price}/mo for the ${selectedObj.name} plan.`}
+              </p>
+              <button
+                onClick={() => subscribePaid(selected)}
+                disabled={busy || blocked}
+                className={`mt-1 px-6 py-3 ${navyBtn}`}
+              >
+                {busy ? "Opening…" : blocked ? "Remove staff first" : isActive ? `Switch to ${selectedObj.name} — ${selectedObj.price}/mo` : `Subscribe to ${selectedObj.name} — ${selectedObj.price}/mo`}
+              </button>
+            </>
+          )}
+        </div>
 
         <p className="mt-6 text-center text-xs text-slate-500">All plans include everything: booking page, deposits, reminders, reviews, and rebooking. Cancel anytime.</p>
       </div>
