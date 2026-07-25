@@ -20,7 +20,6 @@ const playfair = Playfair_Display({
 export const metadata = {
   title: "Kursey — Booking software for salons & appointment businesses",
   description: "Give clients a booking page that works 24/7. Take deposits, cut no-shows, and keep 100% of every appointment — no commission.",
-  icons: { icon: "/icon.png" },
   openGraph: {
     title: "Kursey — Booking software for salons & appointment businesses",
     description: "Give clients a booking page that works 24/7. Take deposits, cut no-shows, and keep 100% of every appointment.",
